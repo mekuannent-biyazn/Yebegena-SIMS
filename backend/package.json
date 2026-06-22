@@ -1,25 +1,30 @@
 {
-  "name": "backend",
+  "name": "yebegena-sims",
   "version": "1.0.0",
-  "description": "",
-  "main": "app.js",
+  "description": "A full-stack MERN Student Information Management System for managing students, teachers, classes, schedules, payments, examinations, notifications, and student progression within the Yebegena educational program.",
+  "main": "server.mjs",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "start": "node server.mjs",
+    "dev": "nodemon server.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mekuannent-biyazn/Yebegena-SIMS.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/mekuannent-biyazn/Yebegena-SIMS/issues"
+  },
+  "homepage": "https://github.com/mekuannent-biyazn/Yebegena-SIMS#readme",
   "dependencies": {
-    "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.7.1"
-  },
-  "devDependencies": {
+    "mongoose": "^9.7.1",
     "nodemon": "^3.1.14"
   }
 }
