@@ -1,0 +1,4 @@
+export const TEACHER_TYPES = {
+  FRESH: "FRESH_TEACHER",
+  ADVANCED: "ADVANCED_TEACHER",
+};

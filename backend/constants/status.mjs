@@ -1,0 +1,16 @@
+export const PAYMENT_STATUS = {
+  UNPAID: "UNPAID",
+  PENDING: "PENDING",
+  PAID: "PAID",
+};
+
+export const REGISTRATION_STATUS = {
+  PENDING: "PENDING",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+};
+
+export const STUDENT_STATUS = {
+  FRESH: "FRESH",
+  ADVANCED: "ADVANCED",
+};
