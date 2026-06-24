@@ -8,38 +8,39 @@ const classChangeRequestSchema = new mongoose.Schema(
       required: true,
     },
 
-    targetStudent: {
+    currentClass: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Class",
+      required: true,
+    },
+
+    desiredClass: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Class",
+    },
+
+    reason: {
+      type: String,
+      trim: true,
+    },
+
+    matchedStudent: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Student",
     },
 
-    requesterClass: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Class",
-      required: true,
-    },
-
-    targetClass: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Class",
-      required: true,
-    },
-
     status: {
       type: String,
-      enum: ["PENDING", "ACCEPTED", "REJECTED", "APPROVED"],
-      default: "PENDING",
-    },
-
-    adminComment: {
-      type: String,
-      trim: true,
+      enum: ["OPEN", "MATCHED", "APPROVED", "REJECTED", "CANCELLED"],
+      default: "OPEN",
     },
 
     approvedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
     },
+
+    approvedAt: Date,
   },
   {
     timestamps: true,

@@ -13,6 +13,7 @@ import notificationRoutes from "./routes/notificationRoutes.mjs";
 import scheduleRoutes from "./routes/scheduleRoutes.mjs";
 import examRoutes from "./routes/examRoutes.mjs";
 import promotionRoutes from "./routes/promotionRoutes.mjs";
+import classChangeRoutes from "./routes/classChangeRoutes.mjs";
 
 const app = express();
 
@@ -40,5 +41,6 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/exams", examRoutes);
 app.use("/api/promotions", promotionRoutes);
+app.use("/api/class-change", classChangeRoutes);
 
 export default app;
