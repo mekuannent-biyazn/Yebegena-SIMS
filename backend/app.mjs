@@ -10,6 +10,7 @@ import classRoutes from "./routes/classRoutes.mjs";
 import studentRoutes from "./routes/studentRoutes.mjs";
 import paymentRoutes from "./routes/paymentRoutes.mjs";
 import notificationRoutes from "./routes/notificationRoutes.mjs";
+import scheduleRoutes from "./routes/scheduleRoutes.mjs";
 
 const app = express();
 
@@ -32,7 +33,8 @@ app.use("/api/kflat-roles", kflatRoleRoutes);
 app.use("/api/teachers", teacherRoutes);
 app.use("/api/classes", classRoutes);
 app.use("/api/students", studentRoutes);
-app.use("/api/v1/payments", paymentRoutes);
-app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/schedules", scheduleRoutes);
 
 export default app;
