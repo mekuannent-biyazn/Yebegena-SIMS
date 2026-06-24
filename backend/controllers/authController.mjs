@@ -1,6 +1,9 @@
 import bcrypt from "bcryptjs";
 
 import User from "../models/User.mjs";
+import Student from "../models/Student.mjs";
+import Kflat from "../models/Kflat.mjs";
+import KflatRole from "../models/KflatRole.mjs";
 
 import normalizePhone from "../utils/normalizePhone.mjs";
 
@@ -11,26 +14,42 @@ import { validateChangePassword } from "../validators/changePasswordValidator.mj
 
 export const register = async (req, res) => {
   try {
-    const { fullName, phoneNumber, password, confirmPassword } = req.body;
-
-    const validationErrors = validateRegister({
+    const {
       fullName,
       phoneNumber,
       password,
       confirmPassword,
-    });
 
-    if (validationErrors.length > 0) {
+      kflat,
+      kflatRole,
+      customKflatRole,
+    } = req.body;
+
+    if (!fullName || !phoneNumber || !password || !confirmPassword) {
       return res.status(400).json({
         success: false,
-        errors: validationErrors,
+        message: "All required fields must be provided",
       });
     }
 
-    const normalizedPhone = normalizePhone(phoneNumber);
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Passwords do not match",
+      });
+    }
+
+    const phoneRegex = /^(09\d{8}|2519\d{8}|\+2519\d{8})$/;
+
+    if (!phoneRegex.test(phoneNumber)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Ethiopian phone number",
+      });
+    }
 
     const existingUser = await User.findOne({
-      phoneNumber: normalizedPhone,
+      phoneNumber,
     });
 
     if (existingUser) {
@@ -40,20 +59,60 @@ export const register = async (req, res) => {
       });
     }
 
+    const kflatExists = await Kflat.findById(kflat);
+
+    if (!kflatExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Selected Kflat not found",
+      });
+    }
+
+    if (kflatRole) {
+      const roleExists = await KflatRole.findById(kflatRole);
+
+      if (!roleExists) {
+        return res.status(404).json({
+          success: false,
+          message: "Selected Kflat role not found",
+        });
+      }
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
       fullName,
-      phoneNumber: normalizedPhone,
+      phoneNumber,
       password: hashedPassword,
+
+      role: "FRESH_STUDENT",
     });
 
-    const token = generateToken(user._id);
+    const student = await Student.create({
+      userId: user._id,
+
+      kflat,
+
+      kflatRole: kflatRole || null,
+
+      customKflatRole: customKflatRole || null,
+
+      studentStatus: "FRESH",
+
+      registrationStatus: "PENDING",
+    });
 
     return res.status(201).json({
       success: true,
-      token,
-      user,
+
+      message:
+        "Registration submitted successfully. Waiting for admin approval.",
+
+      data: {
+        userId: user._id,
+        studentId: student._id,
+      },
     });
   } catch (error) {
     return res.status(500).json({
