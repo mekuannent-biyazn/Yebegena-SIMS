@@ -2,6 +2,8 @@ import Payment from "../models/Payment.mjs";
 import PaymentConfig from "../models/PaymentConfig.mjs";
 import Student from "../models/Student.mjs";
 
+import { createNotification } from "../services/notificationService.mjs";
+
 import uploadToCloudinary from "../utils/uploadToCloudinary.mjs";
 
 export const uploadPayment = async (req, res) => {
@@ -167,6 +169,20 @@ export const approvePayment = async (req, res) => {
 
     await payment.save();
 
+    const student = await Student.findById(payment.student);
+
+    await createNotification({
+      recipient: student.userId,
+
+      title: "Payment Approved",
+
+      message: "Your monthly payment has been approved.",
+
+      type: "PAYMENT",
+
+      createdBy: req.user._id,
+    });
+
     return res.status(200).json({
       success: true,
       message: "Payment approved successfully",
@@ -201,6 +217,18 @@ export const rejectPayment = async (req, res) => {
     payment.reviewedAt = new Date();
 
     await payment.save();
+
+    await createNotification({
+      recipient: student.userId,
+
+      title: "Payment Rejected",
+
+      message: rejectionReason,
+
+      type: "PAYMENT",
+
+      createdBy: req.user._id,
+    });
 
     return res.status(200).json({
       success: true,

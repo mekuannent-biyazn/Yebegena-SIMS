@@ -51,6 +51,18 @@ export const approveStudent = async (req, res) => {
 
     await student.save();
 
+    await createNotification({
+      recipient: student.userId,
+
+      title: "Registration Approved",
+
+      message: "Your registration has been approved.",
+
+      type: "SYSTEM",
+
+      createdBy: req.user._id,
+    });
+
     res.status(200).json({
       success: true,
       message: "Student approved successfully",
@@ -88,6 +100,18 @@ export const assignStudentToClass = async (req, res) => {
     student.assignedClass = classId;
 
     await student.save();
+
+    await createNotification({
+      recipient: student.userId,
+
+      title: "Class Assigned",
+
+      message: "You have been assigned to a class.",
+
+      type: "CLASS",
+
+      createdBy: req.user._id,
+    });
 
     classData.currentStudents += 1;
 
