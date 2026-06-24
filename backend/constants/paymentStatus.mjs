@@ -1,0 +1,7 @@
+export const PAYMENT_STATUS = {
+  PENDING: "PENDING",
+
+  APPROVED: "APPROVED",
+
+  REJECTED: "REJECTED",
+};
