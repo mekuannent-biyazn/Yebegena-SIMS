@@ -11,6 +11,8 @@ import studentRoutes from "./routes/studentRoutes.mjs";
 import paymentRoutes from "./routes/paymentRoutes.mjs";
 import notificationRoutes from "./routes/notificationRoutes.mjs";
 import scheduleRoutes from "./routes/scheduleRoutes.mjs";
+import examRoutes from "./routes/examRoutes.mjs";
+import promotionRoutes from "./routes/promotionRoutes.mjs";
 
 const app = express();
 
@@ -36,5 +38,7 @@ app.use("/api/students", studentRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/schedules", scheduleRoutes);
+app.use("/api/exams", examRoutes);
+app.use("/api/promotions", promotionRoutes);
 
 export default app;
