@@ -9,6 +9,7 @@ import {
   getSingleKflat,
   updateKflat,
   deleteKflat,
+  getActiveKflats,
 } from "../controllers/kflatController.mjs";
 
 const router = express.Router();
@@ -22,5 +23,7 @@ router.post("/", protect, authorize("ADMIN"), createKflat);
 router.put("/:id", protect, authorize("ADMIN"), updateKflat);
 
 router.delete("/:id", protect, authorize("ADMIN"), deleteKflat);
+
+router.get("/", getActiveKflats);
 
 export default router;

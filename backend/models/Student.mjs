@@ -12,12 +12,13 @@ const studentSchema = new mongoose.Schema(
     kflat: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Kflat",
-      required: true,
+      default: null,
     },
 
     kflatRole: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "KflatRole",
+      default: null,
     },
 
     customKflatRole: {
