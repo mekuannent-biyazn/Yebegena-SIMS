@@ -10,6 +10,7 @@ import {
   getPendingStudents,
   rejectStudent,
   studentStats,
+  studentReport,
 } from "../controllers/studentController.mjs";
 
 const router = express.Router();
@@ -25,5 +26,7 @@ router.put("/assign-class", protect, authorize("ADMIN"), assignStudentToClass);
 router.put("/reject/:id", protect, authorize("ADMIN"), rejectStudent);
 
 router.get("/stats", protect, authorize("ADMIN"), studentStats);
+
+router.get("/students", protect, authorize("ADMIN"), studentReport);
 
 export default router;

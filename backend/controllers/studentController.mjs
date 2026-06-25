@@ -210,3 +210,15 @@ export const studentStats = async (req, res) => {
     });
   }
 };
+
+export const studentReport = async (req, res) => {
+  const students = await Student.find()
+    .populate("userId")
+    .populate("assignedClass");
+
+  res.status(200).json({
+    success: true,
+    count: students.length,
+    data: students,
+  });
+};
