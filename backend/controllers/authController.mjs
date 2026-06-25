@@ -48,13 +48,6 @@ export const register = async (req, res) => {
       });
     }
 
-    if (!kflat && kflatRole) {
-      return res.status(400).json({
-        success: false,
-        message: "Kflat role cannot be selected without Kflat",
-      });
-    }
-
     const existingUser = await User.findOne({
       phoneNumber,
     });
@@ -66,13 +59,15 @@ export const register = async (req, res) => {
       });
     }
 
-    const kflatExists = await Kflat.findById(kflat);
+    if (kflat) {
+      const kflatExists = await Kflat.findById(kflat);
 
-    if (!kflatExists) {
-      return res.status(404).json({
-        success: false,
-        message: "Selected Kflat not found",
-      });
+      if (!kflatExists) {
+        return res.status(404).json({
+          success: false,
+          message: "Selected Kflat not found",
+        });
+      }
     }
 
     if (kflatRole) {
@@ -99,7 +94,7 @@ export const register = async (req, res) => {
     const student = await Student.create({
       userId: user._id,
 
-      kflat,
+      kflat: kflat || null,
 
       kflatRole: kflatRole || null,
 
@@ -109,6 +104,13 @@ export const register = async (req, res) => {
 
       registrationStatus: "PENDING",
     });
+
+    if (!kflat && kflatRole) {
+      return res.status(400).json({
+        success: false,
+        message: "Kflat role cannot be selected without Kflat",
+      });
+    }
 
     return res.status(201).json({
       success: true,
