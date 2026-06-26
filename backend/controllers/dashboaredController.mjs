@@ -1,41 +1,47 @@
-import User from "../models/User.mjs";
-import Student from "../models/Student.mjs";
-import Teacher from "../models/Teacher.mjs";
-import Payment from "../models/Payment.mjs";
-import Exam from "../models/Exam.mjs";
+import { getAdminDashboardData } from "../services/dashboaredService.mjs";
 
-const getAdminDashboard = async (req, res) => {
+export const getAdminDashboard = async (req, res) => {
   try {
-    const totalStudents = await Student.countDocuments();
+    const dashboard = await getAdminDashboardData();
 
-    const totalTeachers = await Teacher.countDocuments();
-
-    const pendingPayments = await Payment.countDocuments({
-      status: "PENDING",
-    });
-
-    const upcomingExams = await Exam.countDocuments({
-      examDate: {
-        $gte: new Date(),
-      },
-    });
-
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-
-      data: {
-        totalStudents,
-        totalTeachers,
-        pendingPayments,
-        upcomingExams,
-      },
+      data: dashboard,
     });
   } catch (error) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
   }
 };
 
-export default getAdminDashboard;
+export const getTeacherDashboard = async (req, res) => {
+  try {
+    return res.status(200).json({
+      success: true,
+      message: "Teacher dashboard is under development",
+      data: {},
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const getStudentDashboard = async (req, res) => {
+  try {
+    return res.status(200).json({
+      success: true,
+      message: "Student dashboard is under development",
+      data: {},
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};

@@ -1,12 +1,15 @@
 import Notification from "../models/Notification.mjs";
 
+import {
+  getNotifications,
+  markAsRead,
+  unreadCount,
+  deleteNotification,
+} from "../services/notificationService.mjs";
+
 export const getMyNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find({
-      recipient: req.user._id,
-    }).sort({
-      createdAt: -1,
-    });
+    const notifications = await getNotifications(req.user);
 
     return res.status(200).json({
       success: true,
@@ -21,26 +24,13 @@ export const getMyNotifications = async (req, res) => {
   }
 };
 
-export const markAsRead = async (req, res) => {
+export const getUnreadCount = async (req, res) => {
   try {
-    const notification = await Notification.findById(req.params.id);
-
-    if (!notification) {
-      return res.status(404).json({
-        success: false,
-        message: "Notification not found",
-      });
-    }
-
-    notification.isRead = true;
-
-    notification.readAt = new Date();
-
-    await notification.save();
+    const count = await unreadCount(req.user);
 
     return res.status(200).json({
       success: true,
-      message: "Notification marked as read",
+      count,
     });
   } catch (error) {
     return res.status(500).json({
@@ -50,16 +40,63 @@ export const markAsRead = async (req, res) => {
   }
 };
 
-export const getUnreadCount = async (req, res) => {
+export const readNotification = async (req, res) => {
   try {
-    const count = await Notification.countDocuments({
-      recipient: req.user._id,
-      isRead: false,
-    });
+    const notification = await markAsRead(req.params.id);
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found",
+      });
+    }
 
     return res.status(200).json({
       success: true,
-      count,
+      data: notification,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const removeNotification = async (req, res) => {
+  try {
+    const notification = await deleteNotification(req.params.id);
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Notification deleted successfully",
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const getAllNotifications = async (req, res) => {
+  try {
+    const notifications = await Notification.find()
+      .populate("recipient", "fullName phoneNumber")
+      .populate("createdBy", "fullName")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: notifications.length,
+      data: notifications,
     });
   } catch (error) {
     return res.status(500).json({

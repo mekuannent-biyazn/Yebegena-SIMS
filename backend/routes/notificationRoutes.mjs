@@ -1,19 +1,28 @@
 import express from "express";
 
 import protect from "../middlewares/authMiddleware.mjs";
+import authorizeRoles from "../middlewares/roleMiddleware.mjs";
 
 import {
   getMyNotifications,
-  markAsRead,
   getUnreadCount,
+  readNotification,
+  removeNotification,
+  getAllNotifications,
 } from "../controllers/notificationController.mjs";
 
 const router = express.Router();
 
-router.get("/", protect, getMyNotifications);
+router.use(protect);
 
-router.get("/unread-count", protect, getUnreadCount);
+router.get("/", getMyNotifications);
 
-router.put("/read/:id", protect, markAsRead);
+router.get("/unread-count", getUnreadCount);
+
+router.put("/:id/read", readNotification);
+
+router.delete("/:id", removeNotification);
+
+router.get("/admin/all", authorizeRoles("ADMIN"), getAllNotifications);
 
 export default router;

@@ -2,12 +2,6 @@ import mongoose from "mongoose";
 
 const notificationSchema = new mongoose.Schema(
   {
-    recipient: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-
     title: {
       type: String,
       required: true,
@@ -22,8 +16,20 @@ const notificationSchema = new mongoose.Schema(
 
     type: {
       type: String,
-      enum: ["PAYMENT", "CLASS", "EXAM", "SCHEDULE", "PROMOTION", "SYSTEM"],
-      default: "SYSTEM",
+      enum: ["SUCCESS", "INFO", "WARNING", "ERROR"],
+      default: "INFO",
+    },
+
+    recipientType: {
+      type: String,
+      enum: ["ALL", "ADMIN", "TEACHER", "STUDENT", "USER"],
+      required: true,
+    },
+
+    recipient: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
 
     isRead: {
@@ -31,8 +37,14 @@ const notificationSchema = new mongoose.Schema(
       default: false,
     },
 
-    readAt: {
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    expiresAt: {
       type: Date,
+      default: null,
     },
 
     createdBy: {
@@ -45,6 +57,13 @@ const notificationSchema = new mongoose.Schema(
   },
 );
 
-const Notification = mongoose.model("Notification", notificationSchema);
+notificationSchema.index({
+  recipient: 1,
+  isRead: 1,
+});
 
-export default Notification;
+notificationSchema.index({
+  recipientType: 1,
+});
+
+export default mongoose.model("Notification", notificationSchema);
