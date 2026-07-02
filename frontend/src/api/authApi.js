@@ -17,3 +17,14 @@ export const changePassword = async (data) => {
 
   return response.data;
 };
+
+export const logoutUser = async () => {
+  try {
+    const response = await api.post("/logout");
+    return response.data;
+  } catch (error) {
+    // Even if the API call fails, we should still clear local data
+    console.error("Logout API error:", error);
+    return { success: true };
+  }
+};
