@@ -1,5 +1,4 @@
 import Notification from "../models/Notification.mjs";
-
 import {
   getNotifications,
   markAsRead,
@@ -9,7 +8,11 @@ import {
 
 export const getMyNotifications = async (req, res) => {
   try {
+    console.log("📨 Getting notifications for user:", req.user._id);
+
     const notifications = await getNotifications(req.user);
+
+    console.log(`📨 Found ${notifications.length} notifications`);
 
     return res.status(200).json({
       success: true,
@@ -17,15 +20,18 @@ export const getMyNotifications = async (req, res) => {
       data: notifications,
     });
   } catch (error) {
+    console.error("Error getting notifications:", error);
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Failed to get notifications",
     });
   }
 };
 
 export const getUnreadCount = async (req, res) => {
   try {
+    console.log("📨 Getting unread count for user:", req.user._id);
+
     const count = await unreadCount(req.user);
 
     return res.status(200).json({
@@ -33,9 +39,10 @@ export const getUnreadCount = async (req, res) => {
       count,
     });
   } catch (error) {
+    console.error("Error getting unread count:", error);
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Failed to get unread count",
     });
   }
 };
@@ -56,9 +63,10 @@ export const readNotification = async (req, res) => {
       data: notification,
     });
   } catch (error) {
+    console.error("Error marking notification as read:", error);
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Failed to mark notification as read",
     });
   }
 };
@@ -79,15 +87,18 @@ export const removeNotification = async (req, res) => {
       message: "Notification deleted successfully",
     });
   } catch (error) {
+    console.error("Error deleting notification:", error);
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Failed to delete notification",
     });
   }
 };
 
 export const getAllNotifications = async (req, res) => {
   try {
+    console.log("📨 Admin getting all notifications");
+
     const notifications = await Notification.find()
       .populate("recipient", "fullName phoneNumber")
       .populate("createdBy", "fullName")
@@ -99,9 +110,10 @@ export const getAllNotifications = async (req, res) => {
       data: notifications,
     });
   } catch (error) {
+    console.error("Error getting all notifications:", error);
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Failed to get all notifications",
     });
   }
 };
