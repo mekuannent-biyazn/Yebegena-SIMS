@@ -143,24 +143,3 @@ export const deleteKflat = async (req, res) => {
     });
   }
 };
-
-export const getActiveKflats = async (req, res) => {
-  try {
-    const kflats = await Kflat.find({
-      isActive: true,
-    }).sort({
-      name: 1,
-    });
-
-    res.status(200).json({
-      success: true,
-      count: kflats.length,
-      data: kflats,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};

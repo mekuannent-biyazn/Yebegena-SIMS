@@ -148,24 +148,3 @@ export const deleteKflatRole = async (req, res) => {
     });
   }
 };
-
-export const getActiveKflatRoles = async (req, res) => {
-  try {
-    const roles = await KflatRole.find({
-      isActive: true,
-    }).sort({
-      roleName: 1,
-    });
-
-    res.status(200).json({
-      success: true,
-      count: roles.length,
-      data: roles,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-};
