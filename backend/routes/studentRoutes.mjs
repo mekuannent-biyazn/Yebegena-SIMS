@@ -11,6 +11,8 @@ import {
   rejectStudent,
   studentStats,
   studentReport,
+  getStudentById,
+  assignStudentToClassWithParam,
 } from "../controllers/studentController.mjs";
 
 const router = express.Router();
@@ -28,5 +30,14 @@ router.put("/reject/:id", protect, authorize("ADMIN"), rejectStudent);
 router.get("/stats", protect, authorize("ADMIN"), studentStats);
 
 router.get("/students", protect, authorize("ADMIN"), studentReport);
+
+router.get("/:id", protect, authorize("ADMIN"), getStudentById);
+
+router.patch(
+  "/:studentId/assign-class",
+  protect,
+  authorize("ADMIN"),
+  assignStudentToClassWithParam,
+);
 
 export default router;

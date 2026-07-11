@@ -3,6 +3,7 @@ import User from "../models/User.mjs";
 import Class from "../models/Class.mjs";
 
 import { validateStudentRegistration } from "../validators/studentValidator.mjs";
+import { createNotification } from "../services/notificationService.mjs";
 
 export const getMyProfile = async (req, res) => {
   try {
@@ -51,17 +52,17 @@ export const approveStudent = async (req, res) => {
 
     await student.save();
 
-    await createNotification({
-      recipient: student.userId,
+    // await createNotification({
+    //   recipient: student.userId,
 
-      title: "Registration Approved",
+    //   title: "Registration Approved",
 
-      message: "Your registration has been approved.",
+    //   message: "Your registration has been approved.",
 
-      type: "SYSTEM",
+    //   type: "SYSTEM",
 
-      createdBy: req.user._id,
-    });
+    //   createdBy: req.user._id,
+    // });
 
     res.status(200).json({
       success: true,
@@ -79,17 +80,33 @@ export const assignStudentToClass = async (req, res) => {
   try {
     const { studentId, classId } = req.body;
 
-    const student = await Student.findById(studentId);
-
-    const classData = await Class.findById(classId);
-
-    if (!student || !classData) {
-      return res.status(404).json({
+    // Validate input
+    if (!studentId || !classId) {
+      return res.status(400).json({
         success: false,
-        message: "Student or class not found",
+        message: "Student ID and Class ID are required",
       });
     }
 
+    // Find student and class
+    const student = await Student.findById(studentId);
+    const classData = await Class.findById(classId);
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+    }
+
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: "Class not found",
+      });
+    }
+
+    // Check if class is full
     if (classData.currentStudents >= classData.maxStudents) {
       return res.status(400).json({
         success: false,
@@ -97,34 +114,47 @@ export const assignStudentToClass = async (req, res) => {
       });
     }
 
-    student.assignedClass = classId;
+    // If student already has a class, decrement that class count
+    if (student.assignedClass) {
+      const oldClass = await Class.findById(student.assignedClass);
+      if (oldClass) {
+        oldClass.currentStudents = Math.max(0, oldClass.currentStudents - 1);
+        await oldClass.save();
+      }
+    }
 
+    // Assign new class
+    student.assignedClass = classId;
     await student.save();
 
+    // Increment new class count
+    classData.currentStudents += 1;
+    await classData.save();
+
+    // Create notification
     await createNotification({
       recipient: student.userId,
-
       title: "Class Assigned",
-
-      message: "You have been assigned to a class.",
-
+      message: `You have been assigned to ${classData.className}`,
       type: "CLASS",
-
       createdBy: req.user._id,
     });
 
-    classData.currentStudents += 1;
-
-    await classData.save();
+    // Populate the assigned class data for response
+    const updatedStudent = await Student.findById(studentId)
+      .populate("assignedClass")
+      .populate("userId", "fullName phoneNumber");
 
     res.status(200).json({
       success: true,
       message: "Student assigned successfully",
+      data: updatedStudent,
     });
   } catch (error) {
+    console.error("Error assigning student to class:", error);
     res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Failed to assign student to class",
     });
   }
 };
@@ -221,4 +251,113 @@ export const studentReport = async (req, res) => {
     count: students.length,
     data: students,
   });
+};
+
+export const getStudentById = async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.id)
+      .populate("userId")
+      .populate("kflat")
+      .populate("kflatRole")
+      .populate("assignedClass");
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: "Student not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: student,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+export const assignStudentToClassWithParam = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { classId } = req.body;
+
+    if (!classId) {
+      return res.status(400).json({
+        success: false,
+        message: "Class ID is required",
+      });
+    }
+
+    const student = await Student.findById(studentId).populate(
+      "userId",
+      "fullName phoneNumber",
+    );
+    const classData = await Class.findById(classId);
+
+    if (!student || !classData) {
+      return res.status(404).json({
+        success: false,
+        message: "Student or class not found",
+      });
+    }
+
+    if (classData.currentStudents >= classData.maxStudents) {
+      return res.status(400).json({
+        success: false,
+        message: "Class is full",
+      });
+    }
+
+    // If student already has a class, decrement that class count
+    if (student.assignedClass) {
+      const oldClass = await Class.findById(student.assignedClass);
+      if (oldClass) {
+        oldClass.currentStudents = Math.max(0, oldClass.currentStudents - 1);
+        await oldClass.save();
+      }
+    }
+
+    student.assignedClass = classId;
+    await student.save();
+
+    classData.currentStudents += 1;
+    await classData.save();
+
+    // Create notification with proper fields
+    try {
+      await createNotification({
+        title: "Class Assigned",
+        message: `You have been assigned to ${classData.className}`,
+        type: "INFO",
+        recipientType: "STUDENT",
+        recipient: student.userId._id || student.userId,
+        createdBy: req.user._id,
+        expiresAt: null,
+      });
+    } catch (notifError) {
+      console.error("Failed to create notification:", notifError);
+      // Don't fail the main operation
+    }
+
+    // Populate the assigned class data for response
+    const updatedStudent = await Student.findById(studentId)
+      .populate("assignedClass")
+      .populate("userId", "fullName phoneNumber");
+
+    res.status(200).json({
+      success: true,
+      message: "Student assigned successfully",
+      data: updatedStudent,
+    });
+  } catch (error) {
+    console.error("Error assigning student to class:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to assign student to class",
+    });
+  }
 };

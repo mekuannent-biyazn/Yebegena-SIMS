@@ -27,6 +27,14 @@ const userSchema = new mongoose.Schema(
       default: "FRESH_STUDENT",
     },
 
+    picture: {
+      type: String,
+    },
+
+    picturePublicId: {
+      type: String,
+    },
+
     preferredLanguage: {
       type: String,
       enum: ["en", "am"],
