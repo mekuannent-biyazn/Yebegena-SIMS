@@ -1,16 +1,17 @@
 export const validateChangePassword = (data) => {
   const errors = [];
+  const { currentPassword, newPassword } = data;
 
-  if (!data.currentPassword) {
-    errors.push("Current password is required");
+  if (!currentPassword || currentPassword.length < 6) {
+    errors.push("Current password must be at least 6 characters");
   }
 
-  if (!data.newPassword || data.newPassword.length < 6) {
+  if (!newPassword || newPassword.length < 6) {
     errors.push("New password must be at least 6 characters");
   }
 
-  if (data.newPassword !== data.confirmPassword) {
-    errors.push("Passwords do not match");
+  if (currentPassword && newPassword && currentPassword === newPassword) {
+    errors.push("New password must be different from current password");
   }
 
   return errors;

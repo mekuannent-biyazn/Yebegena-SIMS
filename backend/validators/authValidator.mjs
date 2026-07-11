@@ -38,7 +38,12 @@ const isValidEthiopianPhone = (phoneNumber) => {
   }
 
   // Starts with 251 and total length = 12
-  if (phone.startsWith("251" || "+251") && phone.length === 12) {
+  if (phone.startsWith("251") && phone.length === 12) {
+    return true;
+  }
+
+  // Starts with +251 and total length = 13 (including +)
+  if (phone.startsWith("+251") && phone.length === 13) {
     return true;
   }
 
