@@ -71,14 +71,25 @@ export const createTeacher = async (req, res) => {
 
 export const getAllTeachers = async (req, res) => {
   try {
-    const teachers = await Teacher.find().populate("userId").sort({
-      createdAt: -1,
+    const teachers = await Teacher.find()
+      .populate("userId")
+      .populate("assignedClasses") // Add this to populate assigned classes
+      .sort({
+        createdAt: -1,
+      });
+
+    // Transform the data to include classes count
+    const transformedTeachers = teachers.map((teacher) => {
+      const teacherObj = teacher.toObject();
+      // Add classes field for frontend compatibility
+      teacherObj.classes = teacherObj.assignedClasses || [];
+      return teacherObj;
     });
 
     return res.status(200).json({
       success: true,
       count: teachers.length,
-      data: teachers,
+      data: transformedTeachers,
     });
   } catch (error) {
     return res.status(500).json({
@@ -90,7 +101,9 @@ export const getAllTeachers = async (req, res) => {
 
 export const getTeacherById = async (req, res) => {
   try {
-    const teacher = await Teacher.findById(req.params.id).populate("userId");
+    const teacher = await Teacher.findById(req.params.id)
+      .populate("userId")
+      .populate("assignedClasses"); // Add this
 
     if (!teacher) {
       return res.status(404).json({
@@ -99,9 +112,13 @@ export const getTeacherById = async (req, res) => {
       });
     }
 
+    // Transform the data
+    const teacherObj = teacher.toObject();
+    teacherObj.classes = teacherObj.assignedClasses || [];
+
     return res.status(200).json({
       success: true,
-      data: teacher,
+      data: teacherObj,
     });
   } catch (error) {
     return res.status(500).json({
