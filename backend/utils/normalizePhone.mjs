@@ -1,15 +1,21 @@
 const normalizePhone = (phone) => {
-  let cleaned = phone.trim();
-
-  if (cleaned.startsWith("09")) {
-    cleaned = "+251" + cleaned.substring(1);
+  if (!phone) return phone;
+  
+  // Remove all non-numeric characters
+  let cleaned = phone.replace(/\D/g, '');
+  
+  // If number is 10 digits starting with 0 (e.g., 0978787878)
+  if (cleaned.length === 10 && cleaned.startsWith('0')) {
+    cleaned = '251' + cleaned.substring(1);
   }
-
-  if (cleaned.startsWith("251")) {
-    cleaned = "+" + cleaned;
+  
+  // If number is 9 digits (e.g., 978787878)
+  if (cleaned.length === 9) {
+    cleaned = '251' + cleaned;
   }
-
-  return cleaned;
+  
+  // Add '+' at the beginning if not already there
+  return '+' + cleaned;
 };
 
 export default normalizePhone;
