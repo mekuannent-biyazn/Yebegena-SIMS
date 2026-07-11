@@ -1,10 +1,15 @@
 import { useState, useEffect } from "react";
-import { Plus, FileText, Award, RefreshCw } from "lucide-react";
+import {
+  Plus,
+  FileText,
+  Award,
+  RefreshCw,
+  Users,
+  AlertCircle,
+} from "lucide-react";
 import toast from "react-hot-toast";
-import { format } from "date-fns";
 import { examService } from "../../services/examService";
 import { classService } from "../../services/classService";
-import { studentService } from "../../services/studentService";
 import { useI18nStore } from "../../store/i18nStore";
 import { SkeletonTable } from "../../components/ui/Skeleton";
 import { Badge } from "../../components/ui/Badge";
@@ -30,12 +35,11 @@ const emptyResultForm = {
   remark: "",
 };
 
-export default function ExamsPage() {
+export default function TeacherExamsPage() {
   const { t } = useI18nStore();
   const [exams, setExams] = useState([]);
   const [classes, setClasses] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [filteredStudents, setFilteredStudents] = useState([]);
+  const [eligibleStudents, setEligibleStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [examModal, setExamModal] = useState(false);
   const [resultModal, setResultModal] = useState(false);
@@ -43,8 +47,8 @@ export default function ExamsPage() {
   const [resultForm, setResultForm] = useState(emptyResultForm);
   const [submitting, setSubmitting] = useState(false);
   const [filterClass, setFilterClass] = useState("");
-  const [selectedExamDetails, setSelectedExamDetails] = useState(null);
-  const [existingResult, setExistingResult] = useState(null);
+  const [selectedExam, setSelectedExam] = useState(null);
+  const [loadingStudents, setLoadingStudents] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -53,15 +57,13 @@ export default function ExamsPage() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [classRes, studentRes, examsRes] = await Promise.all([
+      const [classRes, examsRes] = await Promise.all([
         classService.getAll(),
-        studentService.getAll(),
         examService.getAllExams().catch(() => ({ data: { data: [] } })),
       ]);
 
       const cls = classRes.data.data || [];
       setClasses(cls);
-      setStudents(studentRes.data.data || []);
 
       if (examsRes.data && examsRes.data.data) {
         setExams(examsRes.data.data);
@@ -81,9 +83,30 @@ export default function ExamsPage() {
       }
     } catch (error) {
       console.error("Error loading data:", error);
-      toast.error(t("loadingFailed") || "Failed to load data");
+      toast.error("Failed to load data");
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Load ONLY eligible students for the selected exam
+  async function loadEligibleStudents(examId) {
+    setLoadingStudents(true);
+    try {
+      const response = await examService.getEligibleStudents(examId);
+      if (response.data && response.data.data) {
+        setEligibleStudents(response.data.data);
+        return response.data.data;
+      }
+      setEligibleStudents([]);
+      return [];
+    } catch (error) {
+      console.error("Error loading eligible students:", error);
+      toast.error("Failed to load eligible students");
+      setEligibleStudents([]);
+      return [];
+    } finally {
+      setLoadingStudents(false);
     }
   }
 
@@ -124,146 +147,20 @@ export default function ExamsPage() {
       }
     } catch (err) {
       console.error("Create exam error:", err);
-      const errorMessage =
-        err.response?.data?.message ||
-        err.message ||
-        t("operationFailed") ||
-        "Failed to create exam";
-      toast.error(errorMessage);
+      toast.error(
+        err.response?.data?.message || err.message || "Operation failed",
+      );
     } finally {
       setSubmitting(false);
     }
   }
 
-  const getStudentsForExam = async (examId) => {
-    try {
-      // Validate examId
-      if (!examId || examId.trim() === "") {
-        setFilteredStudents([]);
-        setSelectedExamDetails(null);
-        return;
-      }
-
-      const exam = exams.find((e) => e._id === examId);
-      if (!exam) {
-        toast.error("Exam not found");
-        setFilteredStudents([]);
-        setSelectedExamDetails(null);
-        return;
-      }
-
-      setSelectedExamDetails(exam);
-
-      const classId = exam.classId?._id || exam.classId;
-
-      if (!classId) {
-        toast.error("Exam has no class assigned");
-        setFilteredStudents([]);
-        return;
-      }
-
-      const classStudents = students.filter((student) => {
-        const studentClassId =
-          student.assignedClass?._id || student.assignedClass;
-        return (
-          studentClassId && studentClassId.toString() === classId.toString()
-        );
-      });
-
-      setFilteredStudents(classStudents);
-
-      if (classStudents.length === 0) {
-        // Use toast.error instead of toast.info
-        toast.error("No students found in this class");
-      }
-    } catch (error) {
-      console.error("Error filtering students:", error);
-      toast.error("Failed to load students for this class");
-      setFilteredStudents([]);
-      setSelectedExamDetails(null);
-    }
-  };
-
-  // Check if student already has a result for this exam
-  const checkExistingResult = async (examId, studentId) => {
-    try {
-      // You might need to add an endpoint to check this
-      // For now, we'll check locally if the exam has results
-      const exam = exams.find((e) => e._id === examId);
-      if (exam && exam.results) {
-        const existing = exam.results.find((r) => r.studentId === studentId);
-        setExistingResult(existing);
-        return existing;
-      }
-      return null;
-    } catch (error) {
-      console.error("Error checking existing result:", error);
-      return null;
-    }
-  };
-
-  const handleExamIdChange = (examId) => {
-    setResultForm({ ...resultForm, examId, studentId: "" });
-    setExistingResult(null);
-    if (examId && examId.trim()) {
-      getStudentsForExam(examId.trim());
-    } else {
-      setFilteredStudents([]);
-      setSelectedExamDetails(null);
-    }
-  };
-
-  const handleStudentChange = async (studentId) => {
-    setResultForm({ ...resultForm, studentId });
-    setExistingResult(null);
-
-    if (resultForm.examId && studentId) {
-      // Check if result already exists
-      try {
-        const response = await examService.checkResult(
-          resultForm.examId,
-          studentId,
-        );
-        if (response.data && response.data.exists) {
-          setExistingResult(response.data.data);
-          // Use toast.success instead of toast.info
-          toast.success(
-            `Student already has a result: ${response.data.data.score} points`,
-          );
-        }
-      } catch (error) {
-        // If endpoint doesn't exist, check locally
-        console.log("Checking existing result locally");
-        // Try to find the result in the local exams data
-        const exam = exams.find((e) => e._id === resultForm.examId);
-        if (exam && exam.results) {
-          const existing = exam.results.find((r) => r.studentId === studentId);
-          if (existing) {
-            setExistingResult(existing);
-            toast.success(
-              `Student already has a result: ${existing.score} points`,
-            );
-          }
-        }
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (resultModal && resultForm.examId) {
-      getStudentsForExam(resultForm.examId);
-    } else if (resultModal) {
-      setFilteredStudents([]);
-      setSelectedExamDetails(null);
-      setExistingResult(null);
-    }
-  }, [resultModal, resultForm.examId]);
-
   async function handleAddResult(e) {
     e.preventDefault();
 
-    if (!resultForm.examId || resultForm.examId.trim() === "") {
-      toast.error("Please enter or select an exam");
+    // Validate form
+    if (!resultForm.examId) {
+      toast.error("Please select an exam");
       return;
     }
     if (!resultForm.studentId) {
@@ -282,43 +179,27 @@ export default function ExamsPage() {
     }
 
     // Check if score exceeds max score
-    if (selectedExamDetails && scoreNum > selectedExamDetails.maxScore) {
-      toast.error(`Score cannot exceed ${selectedExamDetails.maxScore}`);
+    if (selectedExam && scoreNum > selectedExam.maxScore) {
+      toast.error(`Score cannot exceed ${selectedExam.maxScore}`);
       return;
     }
 
     setSubmitting(true);
     try {
-      console.log("📝 Submitting result:", {
-        examId: resultForm.examId.trim(),
-        studentId: resultForm.studentId,
-        score: scoreNum,
-        remark: resultForm.remark || "",
-      });
-
       const response = await examService.submitResult({
-        examId: resultForm.examId.trim(),
+        examId: resultForm.examId,
         studentId: resultForm.studentId,
         score: scoreNum,
         remark: resultForm.remark || "",
       });
-
-      console.log("📥 Response:", response.data);
 
       if (response.data && response.data.success) {
-        const message = existingResult
-          ? "Result updated successfully! ✅"
-          : "Result added successfully! 🎉";
-        toast.success(message);
+        toast.success("Result added successfully! 🎉");
         setResultModal(false);
         setResultForm(emptyResultForm);
-        setFilteredStudents([]);
-        setSelectedExamDetails(null);
-        setExistingResult(null);
+        setEligibleStudents([]);
+        setSelectedExam(null);
         await loadAll();
-        toast.success(
-          "Data refreshed! Check the exam card for the new result.",
-        );
       } else {
         throw new Error(response.data?.message || "Failed to add result");
       }
@@ -329,16 +210,15 @@ export default function ExamsPage() {
         err.response?.data?.message || err.message || "Failed to add result";
 
       if (errorMsg.includes("already exists")) {
-        errorMsg =
-          "⚠️ Result already exists for this student in this exam. Use the update option instead.";
+        errorMsg = "⚠️ Result already exists for this student in this exam.";
+      } else if (errorMsg.includes("not enrolled in the class")) {
+        errorMsg = "⚠️ Student is not enrolled in the class for this exam.";
       } else if (errorMsg.includes("Exam not found")) {
         errorMsg = "❌ Exam not found. Please check the Exam ID.";
       } else if (errorMsg.includes("Student not found")) {
         errorMsg = "❌ Student not found. Please check the student selection.";
       } else if (errorMsg.includes("Score must be between")) {
         errorMsg = `⚠️ ${errorMsg}`;
-      } else if (errorMsg.includes("Missing required fields")) {
-        errorMsg = "⚠️ Please fill in all required fields.";
       }
 
       toast.error(errorMsg);
@@ -346,6 +226,20 @@ export default function ExamsPage() {
       setSubmitting(false);
     }
   }
+
+  // Handle opening result modal
+  const handleOpenResultModal = async (exam) => {
+    setSelectedExam(exam);
+    setResultForm({
+      ...emptyResultForm,
+      examId: exam._id,
+    });
+    setEligibleStudents([]);
+    setResultModal(true);
+
+    // Load eligible students for this exam
+    await loadEligibleStudents(exam._id);
+  };
 
   const filteredExams = filterClass
     ? exams.filter(
@@ -362,7 +256,7 @@ export default function ExamsPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">
-            Exam Management
+            Exam Management (Teacher)
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {filteredExams.length} exams {filterClass && "in selected class"}
@@ -378,18 +272,6 @@ export default function ExamsPage() {
           </button>
           <button
             onClick={() => {
-              setResultForm(emptyResultForm);
-              setFilteredStudents([]);
-              setSelectedExamDetails(null);
-              setExistingResult(null);
-              setResultModal(true);
-            }}
-            className="btn-secondary"
-          >
-            <Award className="w-4 h-4" /> Add Result
-          </button>
-          <button
-            onClick={() => {
               setExamForm(emptyExamForm);
               setExamModal(true);
             }}
@@ -400,18 +282,20 @@ export default function ExamsPage() {
         </div>
       </div>
 
-      {/* Info card */}
+      {/* Info Card */}
       <div className="card bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
         <div className="flex items-start gap-3">
           <FileText className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-              Exam Management
+              Teacher Exam Management
             </p>
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
-              Create exams for classes (Written + Practical). Students must pass
-              both to be eligible for promotion. Use "Add Result" to record
-              individual student scores after the exam.
+              Create exams for your classes and add results.{" "}
+              <strong>
+                Only students enrolled in the exam's class will be shown
+              </strong>{" "}
+              when adding results.
             </p>
           </div>
         </div>
@@ -444,7 +328,7 @@ export default function ExamsPage() {
           {filteredExams.map((exam) => (
             <div key={exam._id} className="card">
               <div className="flex items-start justify-between flex-wrap gap-3">
-                <div>
+                <div className="flex-1">
                   <h3 className="font-bold text-slate-700 dark:text-slate-200">
                     {exam.title}
                   </h3>
@@ -459,9 +343,6 @@ export default function ExamsPage() {
                     <span className="text-xs text-slate-500 dark:text-slate-400">
                       Max: {exam.maxScore} | Pass: {exam.passingScore}
                     </span>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                      ID: {exam._id}
-                    </span>
                   </div>
                   {exam.description && (
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
@@ -471,10 +352,7 @@ export default function ExamsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => {
-                      setResultForm({ ...emptyResultForm, examId: exam._id });
-                      setResultModal(true);
-                    }}
+                    onClick={() => handleOpenResultModal(exam)}
                     className="btn-outline text-xs py-1 px-3"
                   >
                     <Award className="w-3 h-3" /> Add Result
@@ -625,106 +503,127 @@ export default function ExamsPage() {
         </form>
       </Modal>
 
-      {/* Add Result Modal */}
+      {/* Add Result Modal - ONLY SHOWS ELIGIBLE STUDENTS */}
       <Modal
         isOpen={resultModal}
         onClose={() => {
           setResultModal(false);
-          setFilteredStudents([]);
-          setSelectedExamDetails(null);
-          setExistingResult(null);
+          setEligibleStudents([]);
+          setSelectedExam(null);
+          setResultForm(emptyResultForm);
         }}
-        title={existingResult ? "Update Result" : "Add Result"}
-        size="sm"
+        title="Add Result"
+        size="md"
       >
         <form onSubmit={handleAddResult} className="space-y-4">
+          {/* Exam Info Display */}
           <div>
-            <label className="label">Exam ID *</label>
-            <input
-              type="text"
-              className="input"
-              placeholder="Enter or paste exam ID"
-              value={resultForm.examId}
-              onChange={(e) => handleExamIdChange(e.target.value)}
-              required
-            />
-            <p className="text-xs text-slate-400 mt-1">
-              Find exam ID in the exam card above
-            </p>
-            {selectedExamDetails && (
-              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">
-                  {selectedExamDetails.title} ({selectedExamDetails.examType})
-                </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400">
-                  Class: {selectedExamDetails.classId?.className || "Unknown"} |
-                  Max: {selectedExamDetails.maxScore} | Pass:{" "}
-                  {selectedExamDetails.passingScore}
-                </p>
+            <label className="label">Exam</label>
+            <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+              <p className="font-medium text-slate-700 dark:text-slate-200">
+                {selectedExam?.title || "Loading..."}
+              </p>
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Class: {selectedExam?.classId?.className || "Unknown"}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Max: {selectedExam?.maxScore || 100}
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Pass: {selectedExam?.passingScore || 50}
+                </span>
               </div>
-            )}
-            {resultForm.examId && filteredStudents.length === 0 && (
-              <p className="text-xs text-yellow-600 mt-1">
-                ⚠️ No students found for this exam's class. Please check the
-                exam ID.
-              </p>
-            )}
-            {resultForm.examId && filteredStudents.length > 0 && (
-              <p className="text-xs text-green-600 mt-1">
-                ✓ {filteredStudents.length} student(s) found in this exam's
-                class
-              </p>
-            )}
+            </div>
+            <input
+              type="hidden"
+              value={resultForm.examId}
+              onChange={(e) =>
+                setResultForm({ ...resultForm, examId: e.target.value })
+              }
+            />
           </div>
+
+          {/* Student Selection - ONLY ELIGIBLE STUDENTS */}
           <div>
             <label className="label">Select Student *</label>
-            <select
-              className="input"
-              value={resultForm.studentId}
-              onChange={(e) => handleStudentChange(e.target.value)}
-              required
-              disabled={filteredStudents.length === 0}
-            >
-              <option value="">
-                {filteredStudents.length === 0
-                  ? "-- Enter valid Exam ID first --"
-                  : "-- Select Student --"}
-              </option>
-              {filteredStudents.map((s) => (
-                <option key={s._id} value={s._id}>
-                  {s.userId?.fullName || "Unknown"} (
-                  {s.userId?.phoneNumber || "No phone"})
-                </option>
-              ))}
-            </select>
-            {existingResult && (
-              <p className="text-xs text-amber-600 mt-1">
-                ⚠️ Student already has a result: {existingResult.score} points.
-                Submitting will update it.
-              </p>
+            {loadingStudents ? (
+              <div className="flex items-center justify-center p-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <span className="ml-2 text-sm text-slate-500">
+                  Loading eligible students...
+                </span>
+              </div>
+            ) : (
+              <>
+                <select
+                  className="input"
+                  value={resultForm.studentId}
+                  onChange={(e) =>
+                    setResultForm({ ...resultForm, studentId: e.target.value })
+                  }
+                  required
+                  disabled={eligibleStudents.length === 0}
+                >
+                  <option value="">-- Select Student --</option>
+                  {eligibleStudents.length === 0 ? (
+                    <option value="" disabled>
+                      No eligible students found for this exam
+                    </option>
+                  ) : (
+                    eligibleStudents.map((s) => (
+                      <option key={s._id} value={s._id}>
+                        {s.userId?.fullName || "Unknown"}
+                        {s.userId?.phoneNumber
+                          ? ` (${s.userId.phoneNumber})`
+                          : ""}
+                      </option>
+                    ))
+                  )}
+                </select>
+
+                {/* Student Count Info */}
+                {eligibleStudents.length > 0 && (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                    <Users className="w-3 h-3 inline mr-1" />
+                    {eligibleStudents.length} students enrolled in this class
+                  </p>
+                )}
+
+                {eligibleStudents.length === 0 && selectedExam && (
+                  <div className="flex items-start gap-2 mt-2 p-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      No students found for this class. Please ensure students
+                      are enrolled in the class before adding results.
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </div>
+
+          {/* Score Input */}
           <div>
             <label className="label">Score *</label>
             <input
               type="number"
               className="input"
-              placeholder={`Enter score (max ${selectedExamDetails?.maxScore || 100})`}
+              placeholder={`Enter score (0-${selectedExam?.maxScore || 100})`}
               value={resultForm.score}
               onChange={(e) =>
                 setResultForm({ ...resultForm, score: e.target.value })
               }
               min={0}
-              max={selectedExamDetails?.maxScore || 100}
+              max={selectedExam?.maxScore || 100}
               required
             />
-            {selectedExamDetails && (
-              <p className="text-xs text-slate-400 mt-1">
-                Max score: {selectedExamDetails.maxScore} | Passing:{" "}
-                {selectedExamDetails.passingScore}
-              </p>
-            )}
+            <p className="text-xs text-slate-400 mt-1">
+              Score must be between 0 and {selectedExam?.maxScore || 100}
+            </p>
           </div>
+
+          {/* Remark */}
           <div>
             <label className="label">Remark</label>
             <input
@@ -737,27 +636,25 @@ export default function ExamsPage() {
               }
             />
           </div>
+
+          {/* Action Buttons */}
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
               className="btn-primary flex-1"
-              disabled={submitting || filteredStudents.length === 0}
+              disabled={
+                submitting || eligibleStudents.length === 0 || loadingStudents
+              }
             >
-              {submitting
-                ? existingResult
-                  ? "Updating..."
-                  : "Adding..."
-                : existingResult
-                  ? "Update Result"
-                  : "Add Result"}
+              {submitting ? "Adding..." : "Add Result"}
             </button>
             <button
               type="button"
               onClick={() => {
                 setResultModal(false);
-                setFilteredStudents([]);
-                setSelectedExamDetails(null);
-                setExistingResult(null);
+                setEligibleStudents([]);
+                setSelectedExam(null);
+                setResultForm(emptyResultForm);
               }}
               className="btn-secondary flex-1"
             >

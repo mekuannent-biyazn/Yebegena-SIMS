@@ -1,13 +1,9 @@
 import api from "../lib/axios";
 
 export const studentService = {
-  // getProfile: () => api.get("/students/profile"),
   getPending: () => api.get("/students/pending"),
   approve: (id) => api.put(`/students/approve/${id}`),
   reject: (id) => api.put(`/students/reject/${id}`),
-  // assignClass: (studentId, classId) =>
-  //   api.put("/students/assign-class", { studentId, classId }),
-
   assignClass: (studentId, classId) =>
     api.patch(`/students/${studentId}/assign-class`, {
       classId,

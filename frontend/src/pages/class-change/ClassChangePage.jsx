@@ -1,113 +1,248 @@
-import { useState, useEffect } from 'react'
-import { Plus, RefreshCw, CheckCircle, XCircle } from 'lucide-react'
-import toast from 'react-hot-toast'
-import { classChangeService } from '../../services/classChangeService'
-import { classService } from '../../services/classService'
-import { useAuthStore } from '../../store/authStore'
-import { useI18nStore } from '../../store/i18nStore'
-import { SkeletonCard, SkeletonTable } from '../../components/ui/Skeleton'
-import { Badge } from '../../components/ui/Badge'
-import Modal from '../../components/ui/Modal'
-import EmptyState from '../../components/ui/EmptyState'
-import { formatDate } from '../../utils/helpers'
-import { ROLES } from '../../constants'
+import { useState, useEffect } from "react";
+import {
+  Plus,
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  UserCheck,
+  Users,
+  Edit,
+  Trash2,
+} from "lucide-react";
+import toast from "react-hot-toast";
+import { classChangeService } from "../../services/classChangeService";
+import { classService } from "../../services/classService";
+import { useAuthStore } from "../../store/authStore";
+import { useI18nStore } from "../../store/i18nStore";
+import { SkeletonCard } from "../../components/ui/Skeleton";
+import { Badge } from "../../components/ui/Badge";
+import Modal from "../../components/ui/Modal";
+import EmptyState from "../../components/ui/EmptyState";
+import { formatDate } from "../../utils/helpers";
+import { ROLES } from "../../constants";
 
 export default function ClassChangePage() {
-  const { t } = useI18nStore()
-  const user = useAuthStore((s) => s.user)
-  const isAdmin = user?.role === ROLES.ADMIN
-  const isStudent = user?.role === ROLES.FRESH_STUDENT || user?.role === ROLES.ADVANCED_STUDENT
+  const { t } = useI18nStore();
+  const user = useAuthStore((s) => s.user);
+  const isAdmin = user?.role === ROLES.ADMIN;
+  const isStudent =
+    user?.role === ROLES.FRESH_STUDENT || user?.role === ROLES.ADVANCED_STUDENT;
 
-  const [myRequest, setMyRequest] = useState(null)
-  const [volunteers, setVolunteers] = useState([])
-  const [classes, setClasses] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [createModal, setCreateModal] = useState(false)
-  const [form, setForm] = useState({ desiredClass: '', reason: '' })
-  const [submitting, setSubmitting] = useState(false)
-  const [processing, setProcessing] = useState(null)
+  const [myRequest, setMyRequest] = useState(null);
+  const [volunteers, setVolunteers] = useState([]);
+  const [classes, setClasses] = useState([]);
+  const [currentClass, setCurrentClass] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [createModal, setCreateModal] = useState(false);
+  const [editModal, setEditModal] = useState(false);
+  const [form, setForm] = useState({ desiredClass: "", reason: "" });
+  const [editForm, setEditForm] = useState({
+    id: "",
+    desiredClass: "",
+    reason: "",
+  });
+  const [submitting, setSubmitting] = useState(false);
+  const [processing, setProcessing] = useState(null);
+  const [accepting, setAccepting] = useState(null);
 
   useEffect(() => {
-    loadAll()
-  }, [])
+    loadAll();
+  }, []);
 
   async function loadAll() {
-    setLoading(true)
+    setLoading(true);
     try {
       const promises = [
         classChangeService.getVolunteers(),
         classService.getAll(),
-      ]
-      if (isStudent) promises.push(classChangeService.getMyRequest())
+      ];
+      if (isStudent) promises.push(classChangeService.getMyRequest());
 
-      const results = await Promise.allSettled(promises)
-      setVolunteers(results[0].value?.data?.data || [])
-      setClasses(results[1].value?.data?.data || [])
-      if (isStudent && results[2]?.value) {
-        setMyRequest(results[2].value?.data?.data || null)
+      const results = await Promise.allSettled(promises);
+
+      // Handle volunteers
+      if (results[0].status === "fulfilled") {
+        const data = results[0].value?.data?.data || [];
+        setVolunteers(data);
+        if (results[0].value?.data?.currentClass) {
+          setCurrentClass(results[0].value.data.currentClass);
+        }
       }
-    } catch {
-      toast.error(t('loadingFailed'))
+
+      // Handle classes
+      if (results[1].status === "fulfilled") {
+        setClasses(results[1].value?.data?.data || []);
+      }
+
+      // Handle my request
+      if (isStudent && results[2]?.status === "fulfilled") {
+        const requestData = results[2].value?.data?.data || null;
+        setMyRequest(requestData);
+        if (results[2].value?.data?.currentClass) {
+          setCurrentClass(results[2].value.data.currentClass);
+        }
+      }
+    } catch (error) {
+      console.error("Error loading data:", error);
+      toast.error(t("loadingFailed") || "Failed to load data");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
+  // Check if student can create a new request
+  const canCreateRequest = () => {
+    if (!isStudent) return false;
+    if (!myRequest) return true;
+    // Allow creating new request if cancelled or rejected
+    return myRequest.status === "CANCELLED" || myRequest.status === "REJECTED";
+  };
+
+  // Check if student can edit their request
+  const canEditRequest = () => {
+    if (!myRequest) return false;
+    return myRequest.status === "OPEN";
+  };
+
   async function handleCreateRequest(e) {
-    e.preventDefault()
-    setSubmitting(true)
+    e.preventDefault();
+    setSubmitting(true);
     try {
-      const payload = {}
-      if (form.desiredClass) payload.desiredClass = form.desiredClass
-      if (form.reason) payload.reason = form.reason
-      await classChangeService.createRequest(payload)
-      toast.success('Class change request submitted!')
-      setCreateModal(false)
-      setForm({ desiredClass: '', reason: '' })
-      loadAll()
+      const payload = {};
+      if (form.desiredClass) payload.desiredClass = form.desiredClass;
+      if (form.reason) payload.reason = form.reason;
+      await classChangeService.createRequest(payload);
+      toast.success("Class change request submitted!");
+      setCreateModal(false);
+      setForm({ desiredClass: "", reason: "" });
+      loadAll();
     } catch (err) {
-      toast.error(err.response?.data?.message || t('operationFailed'))
+      const errorMsg =
+        err.response?.data?.message ||
+        t("operationFailed") ||
+        "Failed to create request";
+      toast.error(errorMsg);
     } finally {
-      setSubmitting(false)
+      setSubmitting(false);
+    }
+  }
+
+  async function handleUpdateRequest(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const payload = {};
+      if (editForm.desiredClass) payload.desiredClass = editForm.desiredClass;
+      if (editForm.reason) payload.reason = editForm.reason;
+
+      await classChangeService.updateRequest(editForm.id, payload);
+      toast.success("Request updated successfully!");
+      setEditModal(false);
+      setEditForm({ id: "", desiredClass: "", reason: "" });
+      loadAll();
+    } catch (err) {
+      const errorMsg =
+        err.response?.data?.message || "Failed to update request";
+      toast.error(errorMsg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleAcceptMatch(volunteerId) {
+    if (
+      !confirm(
+        "Do you want to accept this volunteer match? This will create a mutual class change request.",
+      )
+    )
+      return;
+
+    setAccepting(volunteerId);
+    try {
+      const response = await classChangeService.acceptMatch(volunteerId);
+      toast.success(
+        response.data?.message ||
+          "Match accepted successfully! Waiting for admin approval.",
+      );
+      loadAll();
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || "Failed to accept match";
+      toast.error(errorMsg);
+    } finally {
+      setAccepting(null);
     }
   }
 
   async function handleApprove(id) {
-    if (!confirm(t('confirmApprove'))) return
-    setProcessing(id)
+    if (!confirm("Approve this class change request?")) return;
+    setProcessing(id);
     try {
-      await classChangeService.approve(id)
-      toast.success('Request approved!')
-      loadAll()
+      await classChangeService.approve(id);
+      toast.success("Request approved!");
+      loadAll();
     } catch (err) {
-      toast.error(err.response?.data?.message || t('operationFailed'))
+      toast.error(err.response?.data?.message || "Failed to approve");
     } finally {
-      setProcessing(null)
+      setProcessing(null);
     }
   }
 
   async function handleReject(id) {
-    if (!confirm(t('confirmReject'))) return
-    setProcessing(id)
+    if (!confirm("Reject this class change request?")) return;
+    setProcessing(id);
     try {
-      await classChangeService.reject(id)
-      toast.success('Request rejected')
-      loadAll()
+      await classChangeService.reject(id);
+      toast.success("Request rejected");
+      loadAll();
     } catch (err) {
-      toast.error(err.response?.data?.message || t('operationFailed'))
+      toast.error(err.response?.data?.message || "Failed to reject");
     } finally {
-      setProcessing(null)
+      setProcessing(null);
     }
   }
+
+  async function handleCancelRequest() {
+    if (!confirm("Cancel your class change request?")) return;
+    try {
+      await classChangeService.cancel();
+      toast.success("Request cancelled");
+      loadAll();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to cancel");
+    }
+  }
+
+  // Helper function to check if a volunteer matches the current student
+  const isVolunteerMatch = (volunteer) => {
+    if (!currentClass || !volunteer.desiredClass) return false;
+    return (
+      volunteer.desiredClass._id === currentClass._id ||
+      volunteer.desiredClass._id.toString() === currentClass._id.toString()
+    );
+  };
+
+  // Open edit modal with current request data
+  const openEditModal = () => {
+    if (myRequest) {
+      setEditForm({
+        id: myRequest._id,
+        desiredClass: myRequest.desiredClass?._id || "",
+        reason: myRequest.reason || "",
+      });
+      setEditModal(true);
+    }
+  };
 
   if (loading) {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[1, 2].map((i) => <SkeletonCard key={i} />)}
+          {[1, 2].map((i) => (
+            <SkeletonCard key={i} />
+          ))}
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -115,63 +250,147 @@ export default function ClassChangePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{t('classChangePage')}</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{volunteers.length} open requests</p>
+          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">
+            Class Change Requests
+          </h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {volunteers.length} open requests
+          </p>
         </div>
-        {isStudent && !myRequest && (
+        {isStudent && canCreateRequest() && (
           <button onClick={() => setCreateModal(true)} className="btn-primary">
-            <Plus className="w-4 h-4" /> {t('createRequest')}
+            <Plus className="w-4 h-4" /> Create Request
           </button>
         )}
       </div>
 
+      {/* Current Class Info */}
+      {currentClass && (
+        <div className="card bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+          <p className="text-sm text-blue-700 dark:text-blue-300">
+            Your Current Class:{" "}
+            <span className="font-bold">{currentClass.className || "N/A"}</span>
+          </p>
+        </div>
+      )}
+
       {/* My Request (Student) */}
       {isStudent && myRequest && (
         <div className="card">
-          <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-2">
-            <RefreshCw className="w-4 h-4" /> {t('myRequest')}
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+              <RefreshCw className="w-4 h-4" /> My Request
+            </h3>
+            <div className="flex items-center gap-2">
+              {canEditRequest() && (
+                <button
+                  onClick={openEditModal}
+                  className="btn-outline text-xs px-3 py-1 flex items-center gap-1"
+                >
+                  <Edit className="w-3 h-3" /> Edit
+                </button>
+              )}
+              {(myRequest.status === "OPEN" ||
+                myRequest.status === "MATCHED") && (
+                <button
+                  onClick={handleCancelRequest}
+                  className="btn-danger text-xs px-3 py-1 flex items-center gap-1"
+                >
+                  <Trash2 className="w-3 h-3" /> Cancel
+                </button>
+              )}
+              {(myRequest.status === "CANCELLED" ||
+                myRequest.status === "REJECTED") && (
+                <button
+                  onClick={() => setCreateModal(true)}
+                  className="btn-primary text-xs px-3 py-1 flex items-center gap-1"
+                >
+                  <Plus className="w-3 h-3" /> New Request
+                </button>
+              )}
+            </div>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t('status')}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                Status
+              </p>
               <Badge status={myRequest.status} />
             </div>
             <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t('currentClass')}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                Current Class
+              </p>
               <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                {myRequest.student?.assignedClass?.className || 'N/A'}
+                {myRequest.currentClass?.className ||
+                  currentClass?.className ||
+                  "N/A"}
               </p>
             </div>
             <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t('desiredClass')}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                Desired Class
+              </p>
               <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                {myRequest.desiredClass?.className || 'Any'}
+                {myRequest.desiredClass?.className || "Any"}
               </p>
             </div>
             {myRequest.reason && (
               <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 col-span-2">
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{t('reason')}</p>
-                <p className="text-sm text-slate-700 dark:text-slate-200">{myRequest.reason}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  Reason
+                </p>
+                <p className="text-sm text-slate-700 dark:text-slate-200">
+                  {myRequest.reason}
+                </p>
+              </div>
+            )}
+            {myRequest.matchedStudent && (
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 col-span-2">
+                <p className="text-xs text-green-600 dark:text-green-400 mb-1">
+                  Matched With
+                </p>
+                <p className="text-sm font-semibold text-green-700 dark:text-green-300">
+                  {myRequest.matchedStudent?.userId?.fullName ||
+                    "Unknown Student"}
+                </p>
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  Status: <Badge status="MATCHED" />
+                </p>
+              </div>
+            )}
+            {myRequest.status === "REJECTED" && (
+              <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-3 col-span-2">
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  Your request was rejected. You can create a new request.
+                </p>
+              </div>
+            )}
+            {myRequest.status === "CANCELLED" && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-3 col-span-2">
+                <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                  Your request was cancelled. You can create a new request.
+                </p>
               </div>
             )}
           </div>
-          {(myRequest.status === 'REJECTED' || myRequest.status === 'CANCELLED') && (
-            <button onClick={() => setCreateModal(true)} className="btn-outline mt-3 text-xs">
-              Submit New Request
-            </button>
-          )}
         </div>
       )}
 
       {/* Volunteers / All Requests */}
       <div>
-        <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-3">
-          {isAdmin ? 'All Class Change Requests' : t('volunteers')}
+        <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-2">
+          <Users className="w-4 h-4" />
+          {isAdmin ? "All Class Change Requests" : "Volunteer Requests"}
         </h3>
 
         {volunteers.length === 0 ? (
           <div className="card">
-            <EmptyState icon={RefreshCw} title={t('noRequests')} description="No class change requests found." />
+            <EmptyState
+              icon={RefreshCw}
+              title="No Requests"
+              description="No class change requests found."
+            />
           </div>
         ) : (
           <div className="card p-0 overflow-hidden">
@@ -179,67 +398,130 @@ export default function ClassChangePage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-slate-700">
-                    <th className="table-th">Student</th>
-                    <th className="table-th">{t('currentClass')}</th>
-                    <th className="table-th">{t('desiredClass')}</th>
-                    <th className="table-th">{t('status')}</th>
-                    <th className="table-th">{t('date')}</th>
-                    {isAdmin && <th className="table-th">{t('actions')}</th>}
+                    <th className="table-th text-left">Student</th>
+                    <th className="table-th text-left">Current Class</th>
+                    <th className="table-th text-left">Desired Class</th>
+                    <th className="table-th text-left">Status</th>
+                    <th className="table-th text-left">Date</th>
+                    <th className="table-th text-left">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {volunteers.map((req) => (
-                    <tr key={req._id} className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 last:border-0">
-                      <td className="table-td">
-                        <div>
-                          <p className="font-medium text-slate-800 dark:text-slate-100">
-                            {req.student?.userId?.fullName}
-                          </p>
-                          <p className="text-xs text-slate-400 dark:text-slate-500">
-                            {req.student?.userId?.phoneNumber}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="table-td text-slate-600 dark:text-slate-300">
-                        {req.student?.assignedClass?.className || 'N/A'}
-                      </td>
-                      <td className="table-td text-slate-600 dark:text-slate-300">
-                        {req.desiredClass?.className || 'Any'}
-                      </td>
-                      <td className="table-td">
-                        <Badge status={req.status} />
-                      </td>
-                      <td className="table-td text-slate-500 dark:text-slate-400">
-                        {formatDate(req.createdAt)}
-                      </td>
-                      {isAdmin && (
+                  {volunteers.map((req) => {
+                    const isMatch = isVolunteerMatch(req);
+                    const canAccept =
+                      isStudent &&
+                      canCreateRequest() &&
+                      req.status === "OPEN" &&
+                      isMatch;
+
+                    return (
+                      <tr
+                        key={req._id}
+                        className="border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 last:border-0"
+                      >
+                        <td className="table-td">
+                          <div>
+                            <p className="font-medium text-slate-800 dark:text-slate-100">
+                              {req.requesterStudent?.userId?.fullName ||
+                                "Unknown"}
+                            </p>
+                            <p className="text-xs text-slate-400 dark:text-slate-500">
+                              {req.requesterStudent?.userId?.phoneNumber || ""}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="table-td text-slate-600 dark:text-slate-300">
+                          {req.currentClass?.className || "N/A"}
+                        </td>
                         <td className="table-td">
                           <div className="flex items-center gap-2">
-                            {(req.status === 'MATCHED' || req.status === 'OPEN') && (
-                              <>
-                                <button
-                                  onClick={() => handleApprove(req._id)}
-                                  disabled={processing === req._id}
-                                  className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 disabled:opacity-50"
-                                  title={t('approve')}
-                                >
-                                  <CheckCircle className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleReject(req._id)}
-                                  disabled={processing === req._id}
-                                  className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 disabled:opacity-50"
-                                  title={t('reject')}
-                                >
-                                  <XCircle className="w-4 h-4" />
-                                </button>
-                              </>
+                            <span className="text-slate-600 dark:text-slate-300">
+                              {req.desiredClass?.className || "Any"}
+                            </span>
+                            {isMatch && (
+                              <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                Perfect Match! 🎯
+                              </Badge>
                             )}
                           </div>
                         </td>
-                      )}
-                    </tr>
-                  ))}
+                        <td className="table-td">
+                          <Badge status={req.status} />
+                        </td>
+                        <td className="table-td text-slate-500 dark:text-slate-400">
+                          {formatDate(req.createdAt)}
+                        </td>
+                        <td className="table-td">
+                          {isAdmin ? (
+                            <div className="flex items-center gap-2">
+                              {(req.status === "MATCHED" ||
+                                req.status === "OPEN") && (
+                                <>
+                                  <button
+                                    onClick={() => handleApprove(req._id)}
+                                    disabled={processing === req._id}
+                                    className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 disabled:opacity-50"
+                                    title="Approve"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleReject(req._id)}
+                                    disabled={processing === req._id}
+                                    className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 disabled:opacity-50"
+                                    title="Reject"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
+                              {req.status === "APPROVED" && (
+                                <Badge status="APPROVED" />
+                              )}
+                              {req.status === "REJECTED" && (
+                                <Badge status="REJECTED" />
+                              )}
+                              {req.status === "CANCELLED" && (
+                                <Badge status="CANCELLED" />
+                              )}
+                            </div>
+                          ) : (
+                            <>
+                              {canAccept ? (
+                                <button
+                                  onClick={() => handleAcceptMatch(req._id)}
+                                  disabled={accepting === req._id}
+                                  className="btn-success text-xs px-3 py-1 flex items-center gap-1"
+                                >
+                                  <UserCheck className="w-3 h-3" />
+                                  {accepting === req._id
+                                    ? "Accepting..."
+                                    : "Accept Match"}
+                                </button>
+                              ) : isMatch &&
+                                req.status === "OPEN" &&
+                                myRequest &&
+                                myRequest.status !== "CANCELLED" &&
+                                myRequest.status !== "REJECTED" ? (
+                                <span className="text-xs text-yellow-600">
+                                  You have a pending request
+                                </span>
+                              ) : isMatch && req.status !== "OPEN" ? (
+                                <span className="text-xs text-slate-400">
+                                  Not Available
+                                </span>
+                              ) : (
+                                <span className="text-xs text-slate-400">
+                                  No match
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -251,25 +533,34 @@ export default function ClassChangePage() {
       <Modal
         isOpen={createModal}
         onClose={() => setCreateModal(false)}
-        title={t('createRequest')}
+        title="Create Class Change Request"
         size="sm"
       >
         <form onSubmit={handleCreateRequest} className="space-y-4">
           <div>
-            <label className="label">{t('desiredClass')}</label>
+            <label className="label">Desired Class</label>
             <select
               className="input"
               value={form.desiredClass}
-              onChange={(e) => setForm({ ...form, desiredClass: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, desiredClass: e.target.value })
+              }
             >
               <option value="">Any available class</option>
-              {classes.map((c) => (
-                <option key={c._id} value={c._id}>{c.className}</option>
-              ))}
+              {classes
+                .filter((c) => currentClass && c._id !== currentClass._id)
+                .map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.className}
+                  </option>
+                ))}
             </select>
+            <p className="text-xs text-slate-400 mt-1">
+              Select a specific class or leave empty for any class
+            </p>
           </div>
           <div>
-            <label className="label">{t('reason')}</label>
+            <label className="label">Reason</label>
             <textarea
               className="input h-24 resize-none"
               placeholder="Reason for class change..."
@@ -278,15 +569,83 @@ export default function ClassChangePage() {
             />
           </div>
           <div className="flex gap-3 pt-2">
-            <button type="submit" className="btn-primary flex-1" disabled={submitting}>
-              {submitting ? t('loading') : t('submit')}
+            <button
+              type="submit"
+              className="btn-primary flex-1"
+              disabled={submitting}
+            >
+              {submitting ? "Submitting..." : "Submit Request"}
             </button>
-            <button type="button" onClick={() => setCreateModal(false)} className="btn-secondary flex-1">
-              {t('cancel')}
+            <button
+              type="button"
+              onClick={() => setCreateModal(false)}
+              className="btn-secondary flex-1"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Request Modal */}
+      <Modal
+        isOpen={editModal}
+        onClose={() => setEditModal(false)}
+        title="Edit Class Change Request"
+        size="sm"
+      >
+        <form onSubmit={handleUpdateRequest} className="space-y-4">
+          <div>
+            <label className="label">Desired Class</label>
+            <select
+              className="input"
+              value={editForm.desiredClass}
+              onChange={(e) =>
+                setEditForm({ ...editForm, desiredClass: e.target.value })
+              }
+            >
+              <option value="">Any available class</option>
+              {classes
+                .filter((c) => currentClass && c._id !== currentClass._id)
+                .map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.className}
+                  </option>
+                ))}
+            </select>
+            <p className="text-xs text-slate-400 mt-1">
+              Select a specific class or leave empty for any class
+            </p>
+          </div>
+          <div>
+            <label className="label">Reason</label>
+            <textarea
+              className="input h-24 resize-none"
+              placeholder="Reason for class change..."
+              value={editForm.reason}
+              onChange={(e) =>
+                setEditForm({ ...editForm, reason: e.target.value })
+              }
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="submit"
+              className="btn-primary flex-1"
+              disabled={submitting}
+            >
+              {submitting ? "Updating..." : "Update Request"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditModal(false)}
+              className="btn-secondary flex-1"
+            >
+              Cancel
             </button>
           </div>
         </form>
       </Modal>
     </div>
-  )
+  );
 }

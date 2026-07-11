@@ -24,9 +24,6 @@ import ChangePasswordPage from "./pages/auth/ChangePasswordPage";
 // Notification Context
 import { SocketProvider } from "./context/SocketContext";
 
-// Notification Bell Component
-import { NotificationBell } from "./components/NotificationBell";
-
 // Dashboard
 import DashboardPage from "./pages/dashboard/DashboardPage";
 
@@ -37,6 +34,9 @@ import ProfilePage from "./pages/students/ProfilePage";
 
 // Teachers
 import TeachersPage from "./pages/teachers/TeachersPage";
+
+// Admin
+import ClassChangeApprovalPage from "./pages/admin/ClassChangeApprovalPage";
 
 // Classes
 import ClassesPage from "./pages/classes/ClassesPage";
@@ -283,9 +283,18 @@ function App() {
               }
             />
 
+            <Route
+              path="/admin/class-change-approvals"
+              element={
+                <PrivateRoute roles={[ROLES.ADMIN]}>
+                  <ClassChangeApprovalPage />
+                </PrivateRoute>
+              }
+            />
+
             {/* Student-only */}
             <Route
-              path="/profile"
+              path="/student/profile"
               element={
                 <PrivateRoute
                   roles={[ROLES.FRESH_STUDENT, ROLES.ADVANCED_STUDENT]}
@@ -294,6 +303,27 @@ function App() {
                 </PrivateRoute>
               }
             />
+
+            {/* Teacher-only */}
+            <Route
+              path="/teacher/profile"
+              element={
+                <PrivateRoute roles={[ROLES.TEACHER]}>
+                  <ProfilePage />
+                </PrivateRoute>
+              }
+            />
+
+            {/* Admin-only */}
+            <Route
+              path="/admin/profile"
+              element={
+                <PrivateRoute roles={[ROLES.ADMIN]}>
+                  <ProfilePage />
+                </PrivateRoute>
+              }
+            />
+
             <Route
               path="/schedule"
               element={
@@ -311,7 +341,6 @@ function App() {
 
           <Route path="*" element={<CatchAll />} />
         </Routes>
-        <NotificationBell />
       </Router>
     </SocketProvider>
   );

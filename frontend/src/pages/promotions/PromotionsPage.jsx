@@ -17,6 +17,7 @@ export default function PromotionsPage() {
   const [confirmStudent, setConfirmStudent] = useState(null);
   const [promoting, setPromoting] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
+  const [examDetails, setExamDetails] = useState(null);
 
   useEffect(() => {
     load();
@@ -46,6 +47,7 @@ export default function PromotionsPage() {
 
     setPromoting(confirmStudent._id);
     setErrorMessage("");
+    setExamDetails(null);
 
     try {
       const response = await promotionService.promote(confirmStudent._id);
@@ -67,29 +69,64 @@ export default function PromotionsPage() {
       let errorMsg =
         err.response?.data?.message || err.message || t("operationFailed");
 
-      // User-friendly error messages
+      // Parse the error message to show more details
+      let displayMsg = errorMsg;
+      let examInfo = null;
+
+      // User-friendly error messages with more detail
       if (errorMsg.includes("Required exams")) {
-        errorMsg =
+        displayMsg =
           "📝 Required exams (Written and Practical) have not been created for this class yet. Please create both exams first.";
-      } else if (errorMsg.includes("has not passed all exams")) {
-        errorMsg =
-          "❌ Student has not passed all required exams. Please check exam results.";
+      } else if (errorMsg.includes("no result found")) {
+        // Extract which exam is missing
+        if (errorMsg.includes("Written")) {
+          displayMsg =
+            "❌ Student has not taken the Written exam. Please add the Written exam result first.";
+          examInfo = "Missing: Written Exam Result";
+        } else if (errorMsg.includes("Practical")) {
+          displayMsg =
+            "❌ Student has not taken the Practical exam. Please add the Practical exam result first.";
+          examInfo = "Missing: Practical Exam Result";
+        } else {
+          displayMsg =
+            "❌ Student has not completed all required exams. Please check exam results.";
+        }
+      } else if (errorMsg.includes("not passed")) {
+        // Extract which exam was not passed
+        if (errorMsg.includes("Written")) {
+          displayMsg =
+            "❌ Student did not pass the Written exam. Please check the score and passing threshold.";
+          examInfo = "Failed: Written Exam";
+        } else if (errorMsg.includes("Practical")) {
+          displayMsg =
+            "❌ Student did not pass the Practical exam. Please check the score and passing threshold.";
+          examInfo = "Failed: Practical Exam";
+        } else {
+          displayMsg =
+            "❌ Student has not passed all required exams. Please check exam results.";
+        }
       } else if (errorMsg.includes("already at Advanced")) {
-        errorMsg = "✅ This student is already at Advanced level.";
+        displayMsg = "✅ This student is already at Advanced level.";
       } else if (errorMsg.includes("not eligible")) {
-        errorMsg =
+        displayMsg =
           "⚠️ This student is not eligible for promotion. Please check their status.";
       } else if (errorMsg.includes("no assigned class")) {
-        errorMsg =
+        displayMsg =
           "📚 Student has no assigned class. Please assign a class first.";
       }
 
-      setErrorMessage(errorMsg);
-      toast.error(errorMsg);
+      setErrorMessage(displayMsg);
+      setExamDetails(examInfo);
+      toast.error(displayMsg);
     } finally {
       setPromoting(null);
     }
   }
+
+  // Helper function to check if student can be promoted
+  const canPromote = (student) => {
+    return student.assignedClass && student.studentStatus === "FRESH";
+  };
 
   if (loading) return <SkeletonTable rows={6} cols={5} />;
 
@@ -191,10 +228,15 @@ export default function PromotionsPage() {
                       <button
                         onClick={() => {
                           setErrorMessage("");
+                          setExamDetails(null);
                           setConfirmStudent(s);
                         }}
-                        className="btn-success text-xs px-3 py-1.5"
-                        disabled={!s.assignedClass}
+                        className={`text-xs px-3 py-1.5 ${
+                          canPromote(s)
+                            ? "btn-success"
+                            : "bg-slate-200 text-slate-400 cursor-not-allowed"
+                        }`}
+                        disabled={!canPromote(s)}
                       >
                         <TrendingUp className="w-3.5 h-3.5" />
                         {t("promoteStudent") || "Promote"}
@@ -214,6 +256,7 @@ export default function PromotionsPage() {
         onClose={() => {
           setConfirmStudent(null);
           setErrorMessage("");
+          setExamDetails(null);
         }}
         title={t("promoteStudent") || "Promote Student"}
         size="sm"
@@ -237,8 +280,25 @@ export default function PromotionsPage() {
                   <span className="text-xs text-slate-400">→</span>
                   <Badge status="ADVANCED" />
                 </div>
+                {confirmStudent.assignedClass && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Class: {confirmStudent.assignedClass.className}
+                  </p>
+                )}
               </div>
             </div>
+
+            {/* Exam Details */}
+            {examDetails && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    {examDetails}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Error Message */}
             {errorMessage && (
@@ -253,7 +313,7 @@ export default function PromotionsPage() {
             )}
 
             {/* Confirmation Message */}
-            {!errorMessage && (
+            {!errorMessage && !examDetails && (
               <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-3">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
@@ -269,7 +329,9 @@ export default function PromotionsPage() {
             <div className="flex gap-3 pt-1">
               <button
                 onClick={handlePromote}
-                className="btn-success flex-1"
+                className={`btn-success flex-1 ${
+                  !errorMessage ? "" : "opacity-50 cursor-not-allowed"
+                }`}
                 disabled={!!promoting || !!errorMessage}
               >
                 {promoting ? (
@@ -307,6 +369,7 @@ export default function PromotionsPage() {
                 onClick={() => {
                   setConfirmStudent(null);
                   setErrorMessage("");
+                  setExamDetails(null);
                 }}
                 className="btn-secondary flex-1"
                 disabled={!!promoting}
