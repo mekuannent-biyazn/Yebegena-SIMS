@@ -7,6 +7,7 @@ import {
   getMyResults,
   getExamsByClass,
   getAllExams,
+  checkExamResult,
 } from "../controllers/examController.mjs";
 
 const router = express.Router();
@@ -21,5 +22,6 @@ router.get("/my-results", protect, getMyResults);
 
 // Get exams by class
 router.get("/class/:classId", protect, getExamsByClass);
+router.get("/result/check", protect, checkExamResult);
 
 export default router;

@@ -6,98 +6,117 @@ import { createNotification } from "./notificationService.mjs";
 
 const promoteStudent = async (studentId, adminId) => {
   try {
-    // 1. Find the student
     const student = await Student.findById(studentId).populate("assignedClass");
 
     if (!student) {
       throw new Error("Student not found");
     }
 
-    // 2. Check if student is already advanced
     if (student.studentStatus === "ADVANCED") {
       throw new Error("Student is already at Advanced level");
     }
 
-    // 3. Check if student is FRESH
     if (student.studentStatus !== "FRESH") {
       throw new Error(
         `Student is not eligible for promotion (Current status: ${student.studentStatus})`,
       );
     }
 
-    // 4. Check if student has an assigned class
     if (!student.assignedClass) {
       throw new Error("Student has no assigned class");
     }
 
-    // 5. Find exams for this class
-    const writtenExam = await Exam.findOne({
+    const writtenExams = await Exam.find({
       classId: student.assignedClass._id,
       examType: "WRITTEN",
-      isActive: true,
-    });
+    }).sort({ createdAt: -1 });
 
-    const practicalExam = await Exam.findOne({
+    const practicalExams = await Exam.find({
       classId: student.assignedClass._id,
       examType: "PRACTICAL",
-      isActive: true,
-    });
+    }).sort({ createdAt: -1 });
 
-    // 6. Check if exams exist
-    if (!writtenExam || !practicalExam) {
-      console.log(`Missing exams for class: ${student.assignedClass._id}`);
-      console.log(`Written exam found: ${!!writtenExam}`);
-      console.log(`Practical exam found: ${!!practicalExam}`);
+    if (writtenExams.length === 0 || practicalExams.length === 0) {
       throw new Error(
-        "Required exams (Written and Practical) have not been created for this class yet",
+        `Required exams (Written and Practical) have not been created for this class yet.`,
       );
     }
 
-    // 7. Check if student has passed both exams
+    const writtenExam = writtenExams[0];
+    const practicalExam = practicalExams[0];
+
     const writtenResult = await ExamResult.findOne({
       examId: writtenExam._id,
       studentId: student._id,
-      isPassed: true,
     });
 
     const practicalResult = await ExamResult.findOne({
       examId: practicalExam._id,
       studentId: student._id,
-      isPassed: true,
     });
 
-    // 8. Check if student passed both exams
-    if (!writtenResult || !practicalResult) {
-      const missingResults = [];
-      if (!writtenResult) missingResults.push("Written");
-      if (!practicalResult) missingResults.push("Practical");
+    let writtenResultFound = writtenResult;
+    if (!writtenResult) {
+      const allWrittenResults = await ExamResult.find({
+        studentId: student._id,
+      }).populate("examId");
+
+      const classWrittenResults = allWrittenResults.filter(
+        (r) =>
+          r.examId &&
+          r.examId.classId &&
+          r.examId.classId.toString() ===
+            student.assignedClass._id.toString() &&
+          r.examId.examType === "WRITTEN",
+      );
+
+      if (classWrittenResults.length > 0) {
+        const passedWritten = classWrittenResults.find(
+          (r) => r.isPassed === true,
+        );
+        if (passedWritten) {
+          writtenResultFound = passedWritten;
+        }
+      }
+    }
+
+    if (!writtenResultFound || !practicalResult) {
+      const missing = [];
+      if (!writtenResultFound) missing.push("Written");
+      if (!practicalResult) missing.push("Practical");
 
       throw new Error(
-        `Student has not passed all required exams. Missing: ${missingResults.join(" and ")}`,
+        `Student has not completed all required exams. Missing: ${missing.join(" and ")}`,
       );
     }
 
-    // 9. Check if student passed with minimum scores (optional additional validation)
-    const writtenScore = writtenResult.score || 0;
-    const practicalScore = practicalResult.score || 0;
     const writtenPassingScore = writtenExam.passingScore || 50;
     const practicalPassingScore = practicalExam.passingScore || 50;
 
-    if (
-      writtenScore < writtenPassingScore ||
-      practicalScore < practicalPassingScore
-    ) {
+    const writtenPassed = writtenResultFound.score >= writtenPassingScore;
+    const practicalPassed = practicalResult.score >= practicalPassingScore;
+
+    if (!writtenPassed || !practicalPassed) {
+      const missingExams = [];
+      if (!writtenPassed) {
+        missingExams.push(
+          `Written (Score: ${writtenResultFound.score}/${writtenPassingScore} needed)`,
+        );
+      }
+      if (!practicalPassed) {
+        missingExams.push(
+          `Practical (Score: ${practicalResult.score}/${practicalPassingScore} needed)`,
+        );
+      }
+
       throw new Error(
-        `Student scores are below passing threshold. Written: ${writtenScore}/${writtenPassingScore}, Practical: ${practicalScore}/${practicalPassingScore}`,
+        `Student has not passed all required exams. Missing: ${missingExams.join(" and ")}`,
       );
     }
 
-    // 10. Perform the promotion
-    // Update student status
     student.studentStatus = "ADVANCED";
     await student.save();
 
-    // Update user role
     const user = await User.findById(student.userId);
     if (!user) {
       throw new Error("User not found");
@@ -105,43 +124,25 @@ const promoteStudent = async (studentId, adminId) => {
     user.role = "ADVANCED_STUDENT";
     await user.save();
 
-    // 11. Create notification for student
     try {
       await createNotification({
         recipient: student.userId,
         recipientType: "STUDENT",
         title: "🎉 Promotion Successful!",
-        message: `Congratulations ${user.fullName}! You have been promoted from Fresh to Advanced Student. You are now eligible for advanced classes and opportunities.`,
+        message: `Congratulations ${user.fullName}! You have been promoted from Fresh to Advanced Student.`,
         type: "SUCCESS",
         createdBy: adminId,
       });
     } catch (notifError) {
-      console.error("Failed to create promotion notification:", notifError);
-      // Continue even if notification fails
+      throw notifError;
     }
 
-    // 12. Create notification for admin (optional)
-    try {
-      await createNotification({
-        recipient: adminId,
-        recipientType: "ADMIN",
-        title: "Student Promoted",
-        message: `${user.fullName} has been successfully promoted to Advanced Student.`,
-        type: "INFO",
-        createdBy: adminId,
-      });
-    } catch (notifError) {
-      console.error("Failed to create admin notification:", notifError);
-    }
-
-    // Return populated student data
     const promotedStudent = await Student.findById(studentId)
       .populate("assignedClass")
       .populate("userId", "fullName phoneNumber email role");
 
     return promotedStudent;
   } catch (error) {
-    console.error("Promotion error:", error);
     throw error;
   }
 };
