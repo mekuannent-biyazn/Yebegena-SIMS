@@ -1,5 +1,5 @@
 const corsOptions = {
-  origin: "http://localhost:5173" || "https://yebegena-sims.vercel.app/api",
+  origin: "http://localhost:5173" || "https://yebegena-sims.vercel.app",
   credentials: true,
 };
 
