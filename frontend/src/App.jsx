@@ -34,6 +34,9 @@ import ProfilePage from "./pages/students/ProfilePage";
 
 // Teachers
 import TeachersPage from "./pages/teachers/TeachersPage";
+import TeacherDashboardPage from "./pages/teachers/TeacherDashBoardPage";
+import TeacherClassesPage from "./pages/teachers/TeacherClassesPage";
+import TeacherClassStudentsPage from "./pages/teachers/TeacherClassStudentsPage";
 
 // Admin
 import ClassChangeApprovalPage from "./pages/admin/ClassChangeApprovalPage";
@@ -215,14 +218,6 @@ function App() {
               }
             />
             <Route
-              path="/promotions"
-              element={
-                <PrivateRoute roles={[ROLES.ADMIN]}>
-                  <PromotionsPage />
-                </PrivateRoute>
-              }
-            />
-            <Route
               path="/kflats"
               element={
                 <PrivateRoute roles={[ROLES.ADMIN]}>
@@ -239,13 +234,13 @@ function App() {
               }
             />
 
-            {/* Admin + Students */}
+            {/* Teachers + Students */}
             <Route
               path="/exams"
               element={
                 <PrivateRoute
                   roles={[
-                    ROLES.ADMIN,
+                    ROLES.TEACHER,
                     ROLES.FRESH_STUDENT,
                     ROLES.ADVANCED_STUDENT,
                   ]}
@@ -310,6 +305,46 @@ function App() {
               element={
                 <PrivateRoute roles={[ROLES.TEACHER]}>
                   <ProfilePage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/promotions"
+              element={
+                <PrivateRoute roles={[ROLES.TEACHER]}>
+                  <PromotionsPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/teacher/dashboard"
+              element={
+                <PrivateRoute roles={[ROLES.TEACHER]}>
+                  <TeacherDashboardPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/teacher/classes"
+              element={
+                <PrivateRoute roles={[ROLES.TEACHER]}>
+                  <TeacherClassesPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/teacher/classes/:classId/students"
+              element={
+                <PrivateRoute roles={[ROLES.TEACHER]}>
+                  <TeacherClassStudentsPage />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/teacher/exams"
+              element={
+                <PrivateRoute roles={[ROLES.TEACHER]}>
+                  <ExamsPage />
                 </PrivateRoute>
               }
             />
