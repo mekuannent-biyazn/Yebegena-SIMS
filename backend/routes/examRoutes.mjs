@@ -13,9 +13,9 @@ import {
 const router = express.Router();
 
 // Admin routes
-router.post("/", protect, authorize("ADMIN"), createExam);
-router.post("/result", protect, authorize("ADMIN"), addExamResult);
-router.get("/all", protect, authorize("ADMIN"), getAllExams);
+router.post("/", protect, authorize("TEACHER"), createExam);
+router.post("/result", protect, authorize("TEACHER"), addExamResult);
+router.get("/all", protect, authorize("TEACHER"), getAllExams);
 
 // Student routes
 router.get("/my-results", protect, getMyResults);

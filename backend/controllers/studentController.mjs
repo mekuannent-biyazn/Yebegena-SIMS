@@ -361,3 +361,51 @@ export const assignStudentToClassWithParam = async (req, res) => {
     });
   }
 };
+
+export const getStudentsByClass = async (req, res) => {
+  try {
+    const { classId } = req.params;
+
+    // Verify class exists
+    const classData = await Class.findById(classId);
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: "Class not found",
+      });
+    }
+
+    // Get all students in this class
+    const students = await Student.find({
+      assignedClass: classId,
+      registrationStatus: "APPROVED", // Only approved students
+    })
+      .populate({
+        path: "userId",
+        select: "fullName phoneNumber",
+      })
+      .populate({
+        path: "kflat",
+        select: "name",
+      })
+      .populate({
+        path: "kflatRole",
+        select: "name",
+      })
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        class: classData,
+        students: students,
+        count: students.length,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
