@@ -37,21 +37,25 @@ export default function ClassChangeApprovalPage() {
   async function loadRequests() {
     setLoading(true);
     try {
-      const response = await classChangeService.getVolunteers();
+      const response = await classChangeService.getAllRequests();
       console.log("📊 Admin - All Requests:", response.data);
 
       const data = response.data?.data || [];
       setRequests(data);
 
-      // Calculate stats
-      const total = data.length;
-      const open = data.filter((r) => r.status === "OPEN").length;
-      const matched = data.filter((r) => r.status === "MATCHED").length;
-      const approved = data.filter((r) => r.status === "APPROVED").length;
-      const rejected = data.filter((r) => r.status === "REJECTED").length;
-      const cancelled = data.filter((r) => r.status === "CANCELLED").length;
-
-      setStats({ total, open, matched, approved, rejected, cancelled });
+      // Calculate stats from response or compute
+      if (response.data?.stats) {
+        setStats(response.data.stats);
+      } else {
+        // Fallback calculation
+        const total = data.length;
+        const open = data.filter((r) => r.status === "OPEN").length;
+        const matched = data.filter((r) => r.status === "MATCHED").length;
+        const approved = data.filter((r) => r.status === "APPROVED").length;
+        const rejected = data.filter((r) => r.status === "REJECTED").length;
+        const cancelled = data.filter((r) => r.status === "CANCELLED").length;
+        setStats({ total, open, matched, approved, rejected, cancelled });
+      }
 
       if (data.length === 0) {
         toast.success("No class change requests found");
@@ -63,7 +67,6 @@ export default function ClassChangeApprovalPage() {
       const errorMsg =
         error.response?.data?.message || "Failed to load class change requests";
 
-      // Show more specific error message
       if (error.response?.status === 403) {
         toast.error(
           "You do not have permission to view class change requests. Please contact admin.",
@@ -74,7 +77,6 @@ export default function ClassChangeApprovalPage() {
         toast.error(errorMsg);
       }
 
-      // Set empty state
       setRequests([]);
       setStats({
         total: 0,
@@ -196,7 +198,11 @@ export default function ClassChangeApprovalPage() {
         </button>
       );
     } else {
-      return null;
+      return (
+        <span className="text-xs text-slate-400">
+          {request.status.charAt(0) + request.status.slice(1).toLowerCase()}
+        </span>
+      );
     }
   };
 
