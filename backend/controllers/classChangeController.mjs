@@ -309,7 +309,7 @@ export const acceptVolunteerMatch = async (req, res) => {
     const oldClassA = volunteerRequest.currentClass?.className || "N/A";
     const oldClassB = currentStudent.assignedClass?.className || "N/A";
 
-    // --- AUTOMATIC CLASS SWAP STARTS HERE ---
+    // --- IMMEDIATE CLASS SWAP STARTS HERE ---
 
     // Get the volunteer student
     const volunteerStudent = await Student.findById(
@@ -323,7 +323,7 @@ export const acceptVolunteerMatch = async (req, res) => {
       });
     }
 
-    // Swap classes between the two students
+    // Swap classes between the two students IMMEDIATELY
     const tempClass = currentStudent.assignedClass;
     currentStudent.assignedClass = volunteerStudent.assignedClass;
     volunteerStudent.assignedClass = tempClass;
@@ -332,15 +332,15 @@ export const acceptVolunteerMatch = async (req, res) => {
     await currentStudent.save();
     await volunteerStudent.save();
 
-    // --- AUTOMATIC CLASS SWAP ENDS HERE ---
+    // --- CLASS SWAP COMPLETE ---
 
-    // Create a new request for the current student
+    // Create a new request for the current student (already APPROVED)
     currentStudentRequest = await ClassChangeRequest.create({
       requesterStudent: currentStudent._id,
       currentClass: volunteerRequest.currentClass._id,
       desiredClass: volunteerRequest.desiredClass._id,
       reason: "Volunteer match acceptance - Auto approved",
-      status: "APPROVED",
+      status: "APPROVED", // Immediately approved
       approvedBy: req.user._id,
       approvedAt: new Date(),
       matchedStudent: volunteerRequest.requesterStudent._id,
@@ -405,7 +405,6 @@ export const acceptVolunteerMatch = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Accept volunteer match error:", error);
     return res.status(500).json({
       success: false,
       message: error.message,
