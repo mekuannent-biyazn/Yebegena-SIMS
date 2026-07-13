@@ -8,17 +8,24 @@ import {
   getExamsByClass,
   getAllExams,
   checkExamResult,
+  getEligibleStudentsForExam,
 } from "../controllers/examController.mjs";
 
 const router = express.Router();
 
-// Admin routes
+// Student routes
+router.get("/my-results", protect, getMyResults);
+
+// Teacher routes
 router.post("/", protect, authorize("TEACHER"), createExam);
 router.post("/result", protect, authorize("TEACHER"), addExamResult);
 router.get("/all", protect, authorize("TEACHER"), getAllExams);
-
-// Student routes
-router.get("/my-results", protect, getMyResults);
+router.get(
+  "/:examId/eligible-students",
+  protect,
+  authorize("TEACHER"),
+  getEligibleStudentsForExam,
+);
 
 // Get exams by class
 router.get("/class/:classId", protect, getExamsByClass);
