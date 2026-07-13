@@ -10,6 +10,7 @@ import {
 import toast from "react-hot-toast";
 import { examService } from "../../services/examService";
 import { classService } from "../../services/classService";
+import { useTeacher } from "../../hooks/useTeacher";
 import { useI18nStore } from "../../store/i18nStore";
 import { SkeletonTable } from "../../components/ui/Skeleton";
 import { Badge } from "../../components/ui/Badge";
@@ -37,9 +38,8 @@ const emptyResultForm = {
 
 export default function TeacherExamsPage() {
   const { t } = useI18nStore();
+  const { classes, loading: loadingClasses, getMyClasses } = useTeacher();
   const [exams, setExams] = useState([]);
-  const [classes, setClasses] = useState([]);
-  const [eligibleStudents, setEligibleStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [examModal, setExamModal] = useState(false);
   const [resultModal, setResultModal] = useState(false);
@@ -48,6 +48,7 @@ export default function TeacherExamsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [filterClass, setFilterClass] = useState("");
   const [selectedExam, setSelectedExam] = useState(null);
+  const [eligibleStudents, setEligibleStudents] = useState([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
 
   useEffect(() => {
@@ -57,19 +58,20 @@ export default function TeacherExamsPage() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [classRes, examsRes] = await Promise.all([
-        classService.getAll(),
-        examService.getAllExams().catch(() => ({ data: { data: [] } })),
-      ]);
+      // Get teacher's classes first
+      await getMyClasses();
 
-      const cls = classRes.data.data || [];
-      setClasses(cls);
+      // Get all exams for teacher (only exams for their classes)
+      const examsRes = await examService
+        .getAllExams()
+        .catch(() => ({ data: { data: [] } }));
 
       if (examsRes.data && examsRes.data.data) {
         setExams(examsRes.data.data);
       } else {
+        // Fallback: get exams by each class
         let allExams = [];
-        for (const c of cls) {
+        for (const c of classes) {
           try {
             const classExams = await examService.getExamsByClass(c._id);
             if (classExams.data.data) {
@@ -86,29 +88,6 @@ export default function TeacherExamsPage() {
       toast.error("Failed to load data");
     } finally {
       setLoading(false);
-    }
-  }
-
-  // Load ONLY eligible students for the selected exam
-  async function loadEligibleStudents(examId) {
-    setLoadingStudents(true);
-    try {
-      const response = await examService.getEligibleStudents(examId);
-      if (response.data && response.data.data) {
-        setEligibleStudents(response.data.data);
-        return response.data.data;
-      }
-      setEligibleStudents([]);
-      return [];
-    } catch (error) {
-      console.error("Error loading eligible students:", error);
-      toast.error(
-        error.response?.data?.message || "Failed to load eligible students",
-      );
-      setEligibleStudents([]);
-      return [];
-    } finally {
-      setLoadingStudents(false);
     }
   }
 
@@ -157,10 +136,36 @@ export default function TeacherExamsPage() {
     }
   }
 
+  // Load ONLY eligible students for the selected exam using the new endpoint
+  async function loadEligibleStudents(examId) {
+    setLoadingStudents(true);
+    try {
+      const response = await examService.getEligibleStudents(examId);
+      if (response.data && response.data.data) {
+        setEligibleStudents(response.data.data);
+        return response.data.data;
+      }
+      setEligibleStudents([]);
+      return [];
+    } catch (error) {
+      console.error("Error loading eligible students:", error);
+      if (error.response?.status === 403) {
+        toast.error("You are not assigned to this exam's class");
+      } else {
+        toast.error(
+          error.response?.data?.message || "Failed to load eligible students",
+        );
+      }
+      setEligibleStudents([]);
+      return [];
+    } finally {
+      setLoadingStudents(false);
+    }
+  }
+
   async function handleAddResult(e) {
     e.preventDefault();
 
-    // Validate form
     if (!resultForm.examId) {
       toast.error("Please select an exam");
       return;
@@ -180,7 +185,6 @@ export default function TeacherExamsPage() {
       return;
     }
 
-    // Check if score exceeds max score
     if (selectedExam && scoreNum > selectedExam.maxScore) {
       toast.error(`Score cannot exceed ${selectedExam.maxScore}`);
       return;
@@ -196,7 +200,7 @@ export default function TeacherExamsPage() {
       });
 
       if (response.data && response.data.success) {
-        toast.success("Result added successfully! 🎉");
+        toast.success(response.data.message || "Result added successfully! 🎉");
         setResultModal(false);
         setResultForm(emptyResultForm);
         setEligibleStudents([]);
@@ -215,10 +219,12 @@ export default function TeacherExamsPage() {
         errorMsg = "⚠️ Result already exists for this student in this exam.";
       } else if (errorMsg.includes("not enrolled in the class")) {
         errorMsg = "⚠️ Student is not enrolled in the class for this exam.";
+      } else if (errorMsg.includes("not assigned to the class")) {
+        errorMsg = "⚠️ You are not assigned to this exam's class.";
       } else if (errorMsg.includes("Exam not found")) {
-        errorMsg = "❌ Exam not found. Please check the Exam ID.";
+        errorMsg = "❌ Exam not found.";
       } else if (errorMsg.includes("Student not found")) {
-        errorMsg = "❌ Student not found. Please check the student selection.";
+        errorMsg = "❌ Student not found.";
       } else if (errorMsg.includes("Score must be between")) {
         errorMsg = `⚠️ ${errorMsg}`;
       }
@@ -229,7 +235,6 @@ export default function TeacherExamsPage() {
     }
   }
 
-  // Handle opening result modal
   const handleOpenResultModal = async (exam) => {
     setSelectedExam(exam);
     setResultForm({
@@ -238,8 +243,6 @@ export default function TeacherExamsPage() {
     });
     setEligibleStudents([]);
     setResultModal(true);
-
-    // Load eligible students for this exam
     await loadEligibleStudents(exam._id);
   };
 
@@ -250,7 +253,10 @@ export default function TeacherExamsPage() {
       )
     : exams;
 
-  if (loading) return <SkeletonTable rows={5} cols={6} />;
+  if (loading || loadingClasses) return <SkeletonTable rows={5} cols={6} />;
+
+  // Get only classes that the teacher is assigned to
+  const teacherClasses = classes || [];
 
   return (
     <div className="space-y-4">
@@ -293,7 +299,7 @@ export default function TeacherExamsPage() {
               Teacher Exam Management
             </p>
             <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
-              Create exams for your classes and add results.{" "}
+              Create exams for your assigned classes and add results.{" "}
               <strong>
                 Only students enrolled in the exam's class will be shown
               </strong>{" "}
@@ -304,7 +310,7 @@ export default function TeacherExamsPage() {
       </div>
 
       {/* Filter */}
-      {exams.length > 0 && (
+      {exams.length > 0 && teacherClasses.length > 0 && (
         <div className="flex items-center gap-3">
           <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
             Filter by Class:
@@ -315,7 +321,7 @@ export default function TeacherExamsPage() {
             onChange={(e) => setFilterClass(e.target.value)}
           >
             <option value="">All Classes</option>
-            {classes.map((c) => (
+            {teacherClasses.map((c) => (
               <option key={c._id} value={c._id}>
                 {c.className}
               </option>
@@ -390,12 +396,15 @@ export default function TeacherExamsPage() {
               required
             >
               <option value="">-- Select Class --</option>
-              {classes.map((c) => (
+              {teacherClasses.map((c) => (
                 <option key={c._id} value={c._id}>
                   {c.className}
                 </option>
               ))}
             </select>
+            <p className="text-xs text-slate-400 mt-1">
+              Only classes you are assigned to are shown
+            </p>
           </div>
           <div>
             <label className="label">Exam Title *</label>
@@ -518,7 +527,6 @@ export default function TeacherExamsPage() {
         size="md"
       >
         <form onSubmit={handleAddResult} className="space-y-4">
-          {/* Exam Info Display */}
           <div>
             <label className="label">Exam</label>
             <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
@@ -546,7 +554,6 @@ export default function TeacherExamsPage() {
             />
           </div>
 
-          {/* Student Selection - ONLY ELIGIBLE STUDENTS */}
           <div>
             <label className="label">Select Student *</label>
             {loadingStudents ? (
@@ -579,16 +586,18 @@ export default function TeacherExamsPage() {
                         {s.userId?.phoneNumber
                           ? ` (${s.userId.phoneNumber})`
                           : ""}
+                        {s.hasResult ? " ✓ (Has Result)" : ""}
                       </option>
                     ))
                   )}
                 </select>
 
-                {/* Student Count Info */}
                 {eligibleStudents.length > 0 && (
                   <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
                     <Users className="w-3 h-3 inline mr-1" />
                     {eligibleStudents.length} students enrolled in this class
+                    {eligibleStudents.filter((s) => s.hasResult).length > 0 &&
+                      ` (${eligibleStudents.filter((s) => s.hasResult).length} already have results)`}
                   </p>
                 )}
 
@@ -605,7 +614,6 @@ export default function TeacherExamsPage() {
             )}
           </div>
 
-          {/* Score Input */}
           <div>
             <label className="label">Score *</label>
             <input
@@ -625,7 +633,6 @@ export default function TeacherExamsPage() {
             </p>
           </div>
 
-          {/* Remark */}
           <div>
             <label className="label">Remark</label>
             <input
@@ -639,7 +646,6 @@ export default function TeacherExamsPage() {
             />
           </div>
 
-          {/* Action Buttons */}
           <div className="flex gap-3 pt-2">
             <button
               type="submit"
