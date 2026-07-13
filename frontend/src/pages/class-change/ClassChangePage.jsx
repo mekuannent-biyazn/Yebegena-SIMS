@@ -9,6 +9,7 @@ import {
   Edit,
   Trash2,
   ArrowRight,
+  Swap,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { classChangeService } from "../../services/classChangeService";
@@ -95,7 +96,7 @@ export default function ClassChangePage() {
   const canCreateRequest = () => {
     if (!isStudent) return false;
     if (!myRequest) return true;
-    // Allow creating new request if cancelled, rejected, or approved (after class swap)
+    // Allow creating new request if cancelled, rejected, or approved
     return ["CANCELLED", "REJECTED", "APPROVED"].includes(myRequest.status);
   };
 
@@ -105,8 +106,8 @@ export default function ClassChangePage() {
     return myRequest.status === "OPEN";
   };
 
-  // Check if student can swap classes (when matched)
-  const canSwapClasses = () => {
+  // Check if student has a matched request waiting for swap
+  const hasMatchedRequest = () => {
     if (!myRequest) return false;
     return myRequest.status === "MATCHED" && myRequest.matchedStudent;
   };
@@ -156,6 +157,7 @@ export default function ClassChangePage() {
     }
   }
 
+  // Handle accepting a volunteer match - IMMEDIATE SWAP
   async function handleAcceptMatch(volunteerId) {
     if (
       !confirm(
@@ -172,7 +174,7 @@ export default function ClassChangePage() {
       if (response.data?.data?.currentStudent?.newClass) {
         setCurrentClass(response.data.data.currentStudent.newClass);
         toast.success(
-          `✅ Class swapped! You are now in: ${response.data.data.currentStudent.newClass.className || "new class"}`,
+          `✅ Class swapped! You are now in: ${response.data.data.currentStudent.newClass.className}`,
         );
       } else {
         toast.success(
@@ -182,9 +184,6 @@ export default function ClassChangePage() {
 
       // Refresh all data to show updated state
       await loadAll();
-
-      // Show additional success message
-      toast.success("🎉 Your class has been updated successfully!");
     } catch (err) {
       const errorMsg = err.response?.data?.message || "Failed to accept match";
       toast.error(errorMsg);
@@ -193,8 +192,14 @@ export default function ClassChangePage() {
     }
   }
 
+  // Handle completing the swap for matched requests
   async function handleCompleteSwap() {
-    // Find the volunteer request ID that matches with the current student
+    if (!myRequest?.matchedStudent) {
+      toast.error("No match found to swap with");
+      return;
+    }
+
+    // Find the volunteer request that matches with the current student
     const matchedVolunteer = volunteers.find(
       (v) =>
         v.status === "OPEN" &&
@@ -237,34 +242,6 @@ export default function ClassChangePage() {
     }
   }
 
-  async function handleApprove(id) {
-    if (!confirm("Approve this class change request?")) return;
-    setProcessing(id);
-    try {
-      await classChangeService.approve(id);
-      toast.success("Request approved!");
-      await loadAll();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to approve");
-    } finally {
-      setProcessing(null);
-    }
-  }
-
-  async function handleReject(id) {
-    if (!confirm("Reject this class change request?")) return;
-    setProcessing(id);
-    try {
-      await classChangeService.reject(id);
-      toast.success("Request rejected");
-      await loadAll();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to reject");
-    } finally {
-      setProcessing(null);
-    }
-  }
-
   async function handleCancelRequest() {
     if (!confirm("Cancel your class change request?")) return;
     try {
@@ -297,7 +274,7 @@ export default function ClassChangePage() {
     }
   };
 
-  // Check if the volunteer request should be hidden (already approved or from the current user)
+  // Check if the volunteer request should be hidden
   const shouldHideVolunteer = (volunteer) => {
     // Hide if the request is APPROVED (class already swapped)
     if (volunteer.status === "APPROVED") return true;
@@ -313,39 +290,6 @@ export default function ClassChangePage() {
     return false;
   };
 
-  // Get status display text and color
-  const getStatusDisplay = (status) => {
-    const statusMap = {
-      OPEN: {
-        text: "📋 Open",
-        color:
-          "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-      },
-      MATCHED: {
-        text: "🔄 Match Found",
-        color:
-          "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-      },
-      APPROVED: {
-        text: "✅ Class Swapped",
-        color:
-          "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
-      },
-      REJECTED: {
-        text: "❌ Rejected",
-        color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-      },
-      CANCELLED: {
-        text: "🚫 Cancelled",
-        color:
-          "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
-      },
-    };
-    return (
-      statusMap[status] || { text: status, color: "bg-gray-100 text-gray-700" }
-    );
-  };
-
   if (loading) {
     return (
       <div className="space-y-4">
@@ -358,7 +302,7 @@ export default function ClassChangePage() {
     );
   }
 
-  // Show message for admin (they should use the admin approval page)
+  // Show message for admin
   if (isAdmin) {
     return (
       <div className="card">
@@ -507,7 +451,7 @@ export default function ClassChangePage() {
               </div>
             )}
 
-            {/* Show match details with Swap button when MATCHED */}
+            {/* Matched Status with Swap Button - THIS IS THE KEY SECTION */}
             {myRequest.status === "MATCHED" && myRequest.matchedStudent && (
               <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 col-span-2 border-2 border-yellow-200 dark:border-yellow-800">
                 <div className="flex items-center justify-between">
@@ -526,9 +470,9 @@ export default function ClassChangePage() {
                   <button
                     onClick={handleCompleteSwap}
                     disabled={processing === myRequest._id}
-                    className="btn-success text-sm px-4 py-2 flex items-center gap-2"
+                    className="btn-success text-sm px-6 py-2.5 flex items-center gap-2 font-semibold shadow-lg hover:shadow-xl transition-all"
                   >
-                    <RefreshCw
+                    <Swap
                       className={`w-4 h-4 ${
                         processing === myRequest._id ? "animate-spin" : ""
                       }`}
@@ -537,15 +481,15 @@ export default function ClassChangePage() {
                   </button>
                 </div>
                 <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
-                  Click "Swap Now" to instantly exchange classes with your
+                  ⚡ Click "Swap Now" to instantly exchange classes with your
                   match.
                 </p>
               </div>
             )}
 
-            {/* Show success message when APPROVED */}
+            {/* Approved Status - Class Already Swapped */}
             {myRequest.status === "APPROVED" && (
-              <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-3 col-span-2">
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-3 col-span-2 border border-emerald-200 dark:border-emerald-800">
                 <p className="text-xs text-emerald-600 dark:text-emerald-400">
                   ✅ Class swap completed! You are now in:{" "}
                   <span className="font-bold">
@@ -569,8 +513,8 @@ export default function ClassChangePage() {
             )}
 
             {myRequest.status === "CANCELLED" && (
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-3 col-span-2">
-                <p className="text-xs text-yellow-600 dark:text-yellow-400">
+              <div className="bg-gray-50 dark:bg-gray-900/20 rounded-xl p-3 col-span-2">
+                <p className="text-xs text-gray-600 dark:text-gray-400">
                   Your request was cancelled. You can create a new request.
                 </p>
               </div>
@@ -579,11 +523,11 @@ export default function ClassChangePage() {
         </div>
       )}
 
-      {/* Volunteers / All Requests */}
+      {/* Volunteers / Available Requests */}
       <div>
         <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-2">
           <Users className="w-4 h-4" />
-          {isAdmin ? "All Class Change Requests" : "Available Volunteers"}
+          Available Volunteers
         </h3>
 
         {volunteers.filter((v) => !shouldHideVolunteer(v)).length === 0 ? (
@@ -658,73 +602,34 @@ export default function ClassChangePage() {
                             {formatDate(req.createdAt)}
                           </td>
                           <td className="table-td">
-                            {isAdmin ? (
-                              <div className="flex items-center gap-2">
-                                {(req.status === "MATCHED" ||
-                                  req.status === "OPEN") && (
-                                  <>
-                                    <button
-                                      onClick={() => handleApprove(req._id)}
-                                      disabled={processing === req._id}
-                                      className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 disabled:opacity-50"
-                                      title="Approve"
-                                    >
-                                      <CheckCircle className="w-4 h-4" />
-                                    </button>
-                                    <button
-                                      onClick={() => handleReject(req._id)}
-                                      disabled={processing === req._id}
-                                      className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 disabled:opacity-50"
-                                      title="Reject"
-                                    >
-                                      <XCircle className="w-4 h-4" />
-                                    </button>
-                                  </>
-                                )}
-                                {req.status === "APPROVED" && (
-                                  <Badge status="APPROVED" />
-                                )}
-                                {req.status === "REJECTED" && (
-                                  <Badge status="REJECTED" />
-                                )}
-                                {req.status === "CANCELLED" && (
-                                  <Badge status="CANCELLED" />
-                                )}
-                              </div>
+                            {canAccept ? (
+                              <button
+                                onClick={() => handleAcceptMatch(req._id)}
+                                disabled={accepting === req._id}
+                                className="btn-success text-xs px-4 py-1.5 flex items-center gap-1 font-medium"
+                              >
+                                <UserCheck className="w-3 h-3" />
+                                {accepting === req._id
+                                  ? "Swapping..."
+                                  : "Accept & Swap"}
+                              </button>
+                            ) : isMatch &&
+                              req.status === "OPEN" &&
+                              myRequest &&
+                              !["CANCELLED", "REJECTED", "APPROVED"].includes(
+                                myRequest.status,
+                              ) ? (
+                              <span className="text-xs text-yellow-600">
+                                You have a pending request
+                              </span>
+                            ) : isMatch && req.status !== "OPEN" ? (
+                              <span className="text-xs text-slate-400">
+                                Not Available
+                              </span>
                             ) : (
-                              <>
-                                {canAccept ? (
-                                  <button
-                                    onClick={() => handleAcceptMatch(req._id)}
-                                    disabled={accepting === req._id}
-                                    className="btn-success text-xs px-3 py-1 flex items-center gap-1"
-                                  >
-                                    <UserCheck className="w-3 h-3" />
-                                    {accepting === req._id
-                                      ? "Swapping..."
-                                      : "Accept & Swap"}
-                                  </button>
-                                ) : isMatch &&
-                                  req.status === "OPEN" &&
-                                  myRequest &&
-                                  ![
-                                    "CANCELLED",
-                                    "REJECTED",
-                                    "APPROVED",
-                                  ].includes(myRequest.status) ? (
-                                  <span className="text-xs text-yellow-600">
-                                    You have a pending request
-                                  </span>
-                                ) : isMatch && req.status !== "OPEN" ? (
-                                  <span className="text-xs text-slate-400">
-                                    Not Available
-                                  </span>
-                                ) : (
-                                  <span className="text-xs text-slate-400">
-                                    No match
-                                  </span>
-                                )}
-                              </>
+                              <span className="text-xs text-slate-400">
+                                No match
+                              </span>
                             )}
                           </td>
                         </tr>
@@ -738,19 +643,18 @@ export default function ClassChangePage() {
       </div>
 
       {/* How it Works Info Card */}
-      <div className="card bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+      <div className="card bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
         <div className="flex items-start gap-3">
           <ArrowRight className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-              How Automatic Class Swapping Works
+              ⚡ Instant Class Swapping
             </p>
             <ul className="text-xs text-blue-600 dark:text-blue-400 mt-1 list-disc list-inside space-y-1">
               <li>Create a request for the class you want</li>
               <li>Find a volunteer who wants your class (Perfect Match 🎯)</li>
               <li>Click "Accept & Swap" to instantly exchange classes</li>
               <li>Both students are immediately moved to their new classes</li>
-              <li>Notifications are sent to both students</li>
               <li>No admin approval needed - instant class change!</li>
             </ul>
           </div>
