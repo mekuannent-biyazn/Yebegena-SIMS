@@ -34,7 +34,6 @@ import ProfilePage from "./pages/students/ProfilePage";
 
 // Teachers
 import TeachersPage from "./pages/teachers/TeachersPage";
-import TeacherDashboardPage from "./pages/teachers/TeacherDashBoardPage";
 import TeacherClassesPage from "./pages/teachers/TeacherClassesPage";
 import TeacherClassStudentsPage from "./pages/teachers/TeacherClassStudentsPage";
 
@@ -313,14 +312,6 @@ function App() {
               element={
                 <PrivateRoute roles={[ROLES.TEACHER]}>
                   <PromotionsPage />
-                </PrivateRoute>
-              }
-            />
-            <Route
-              path="/teacher/dashboard"
-              element={
-                <PrivateRoute roles={[ROLES.TEACHER]}>
-                  <TeacherDashboardPage />
                 </PrivateRoute>
               }
             />
