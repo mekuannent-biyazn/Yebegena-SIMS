@@ -27,19 +27,28 @@ export const SocketProvider = ({ children }) => {
       return;
     }
 
+    // Get WebSocket URL from environment variable
+    const WS_URL =
+      import.meta.env.VITE_WS_URL ||
+      import.meta.env.VITE_API_URL?.replace(/^http/, "ws") ||
+      "ws://localhost:5000";
+
+    console.log("🔌 Connecting to WebSocket at:", WS_URL);
+
     // Connect to socket server
-    const newSocket = io(
-      import.meta.env.VITE_API_URL || "http://localhost:5000",
-      {
-        auth: {
-          token: token,
-        },
-        query: {
-          userId: user._id,
-        },
-        transports: ["websocket"],
+    const newSocket = io(WS_URL, {
+      auth: {
+        token: token,
       },
-    );
+      query: {
+        userId: user._id,
+      },
+      transports: ["websocket", "polling"],
+      withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
 
     newSocket.on("connect", () => {
       console.log("🔗 Socket connected");
@@ -51,19 +60,29 @@ export const SocketProvider = ({ children }) => {
       }
     });
 
-    newSocket.on("disconnect", () => {
-      console.log("🔌 Socket disconnected");
+    newSocket.on("disconnect", (reason) => {
+      console.log("🔌 Socket disconnected:", reason);
       setIsConnected(false);
     });
 
     newSocket.on("connect_error", (error) => {
-      console.error("Socket connection error:", error);
+      console.error("❌ Socket connection error:", error.message);
       setIsConnected(false);
+    });
+
+    newSocket.on("reconnect", (attemptNumber) => {
+      console.log(`🔄 Socket reconnected after ${attemptNumber} attempts`);
+      setIsConnected(true);
+    });
+
+    newSocket.on("reconnect_error", (error) => {
+      console.error("❌ Socket reconnection error:", error.message);
     });
 
     setSocket(newSocket);
 
     return () => {
+      console.log("🧹 Cleaning up socket connection");
       newSocket.disconnect();
       setSocket(null);
       setIsConnected(false);
