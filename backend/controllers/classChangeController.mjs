@@ -337,12 +337,13 @@ export const acceptVolunteerMatch = async (req, res) => {
     // Create a new request for the current student
     currentStudentRequest = await ClassChangeRequest.create({
       requesterStudent: currentStudent._id,
-      currentClass: volunteerRequest.currentClass._id, // Volunteer's old class
-      desiredClass: volunteerRequest.desiredClass._id, // Volunteer's desired class
+      currentClass: volunteerRequest.currentClass._id,
+      desiredClass: volunteerRequest.desiredClass._id,
       reason: "Volunteer match acceptance - Auto approved",
-      status: "APPROVED", // Auto-approved since the swap is done
+      status: "APPROVED",
       approvedBy: req.user._id,
       approvedAt: new Date(),
+      matchedStudent: volunteerRequest.requesterStudent._id,
     });
 
     // Update the volunteer's request to APPROVED
@@ -351,14 +352,6 @@ export const acceptVolunteerMatch = async (req, res) => {
     volunteerRequest.approvedBy = req.user._id;
     volunteerRequest.approvedAt = new Date();
     await volunteerRequest.save();
-
-    // Also update the current student's request
-    currentStudentRequest.status = "APPROVED";
-    currentStudentRequest.matchedStudent =
-      volunteerRequest.requesterStudent._id;
-    currentStudentRequest.approvedBy = req.user._id;
-    currentStudentRequest.approvedAt = new Date();
-    await currentStudentRequest.save();
 
     // Send notifications to both students
     try {
