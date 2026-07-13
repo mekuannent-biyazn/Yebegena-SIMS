@@ -102,7 +102,9 @@ export default function TeacherExamsPage() {
       return [];
     } catch (error) {
       console.error("Error loading eligible students:", error);
-      toast.error("Failed to load eligible students");
+      toast.error(
+        error.response?.data?.message || "Failed to load eligible students",
+      );
       setEligibleStudents([]);
       return [];
     } finally {

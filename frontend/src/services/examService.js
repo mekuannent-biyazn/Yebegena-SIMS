@@ -1,3 +1,9 @@
+// import api from "../lib/axios";
+
+// export const examService = {
+//   getExamResults: (examId) => api.get(`/exams/${examId}/results`),
+// };
+
 import api from "../lib/axios";
 
 export const examService = {
@@ -7,8 +13,12 @@ export const examService = {
   submitResult: (data) => api.post("/exams/result", data),
   checkResult: (examId, studentId) =>
     api.get(`/exams/result/check?examId=${examId}&studentId=${studentId}`),
-  getExamResults: (examId) => api.get(`/exams/${examId}/results`),
+
   getMyResults: () => api.get("/exams/my-results"),
+
+  // **NEW: Get eligible students for an exam (only students in the exam's class)**
+  getEligibleStudents: (examId) =>
+    api.get(`/exams/${examId}/eligible-students`),
 
   getTeacherExamsByClass: (classId) =>
     api.get(`/teacher/exams/class/${classId}`),
@@ -19,3 +29,5 @@ export const examService = {
   updateTeacherExamResults: (examId, data) =>
     api.put(`/teacher/exams/${examId}/results`, data),
 };
+
+export default examService;
