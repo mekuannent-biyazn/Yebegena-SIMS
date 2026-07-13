@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { examService } from "../../services/examService";
-import { classService } from "../../services/classService";
 import { useTeacher } from "../../hooks/useTeacher";
 import { useI18nStore } from "../../store/i18nStore";
 import { SkeletonTable } from "../../components/ui/Skeleton";
@@ -58,10 +57,8 @@ export default function TeacherExamsPage() {
   async function loadAll() {
     setLoading(true);
     try {
-      // Get teacher's classes first
       await getMyClasses();
 
-      // Get all exams for teacher (only exams for their classes)
       const examsRes = await examService
         .getAllExams()
         .catch(() => ({ data: { data: [] } }));
@@ -69,7 +66,6 @@ export default function TeacherExamsPage() {
       if (examsRes.data && examsRes.data.data) {
         setExams(examsRes.data.data);
       } else {
-        // Fallback: get exams by each class
         let allExams = [];
         for (const c of classes) {
           try {
@@ -136,7 +132,6 @@ export default function TeacherExamsPage() {
     }
   }
 
-  // Load ONLY eligible students for the selected exam using the new endpoint
   async function loadEligibleStudents(examId) {
     setLoadingStudents(true);
     try {
@@ -151,6 +146,8 @@ export default function TeacherExamsPage() {
       console.error("Error loading eligible students:", error);
       if (error.response?.status === 403) {
         toast.error("You are not assigned to this exam's class");
+      } else if (error.response?.status === 404) {
+        toast.error("Exam not found. Please refresh and try again.");
       } else {
         toast.error(
           error.response?.data?.message || "Failed to load eligible students",
@@ -255,7 +252,6 @@ export default function TeacherExamsPage() {
 
   if (loading || loadingClasses) return <SkeletonTable rows={5} cols={6} />;
 
-  // Get only classes that the teacher is assigned to
   const teacherClasses = classes || [];
 
   return (
@@ -514,7 +510,7 @@ export default function TeacherExamsPage() {
         </form>
       </Modal>
 
-      {/* Add Result Modal - ONLY SHOWS ELIGIBLE STUDENTS */}
+      {/* Add Result Modal */}
       <Modal
         isOpen={resultModal}
         onClose={() => {
