@@ -106,16 +106,18 @@ export const getAvailableVolunteers = async (req, res) => {
     const userRole = req.user.role;
     const isAdmin = userRole === "ADMIN";
 
-    // Find all OPEN requests
-    let query = { status: "OPEN" };
+    // If admin, get ALL requests (not just OPEN)
+    let query = {};
 
-    // If not admin, exclude the current user's requests
     if (!isAdmin) {
+      // For students, only show OPEN requests
+      query.status = "OPEN";
       const student = await Student.findOne({ userId: req.user._id });
       if (student) {
         query.requesterStudent = { $ne: student._id };
       }
     }
+    // Admin sees all statuses
 
     const requests = await ClassChangeRequest.find(query)
       .populate({
@@ -136,12 +138,22 @@ export const getAvailableVolunteers = async (req, res) => {
       })
       .sort({ createdAt: -1 });
 
-    // If admin, return all requests with status info
+    // If admin, return all requests with stats
     if (isAdmin) {
+      const stats = {
+        total: requests.length,
+        open: requests.filter((r) => r.status === "OPEN").length,
+        matched: requests.filter((r) => r.status === "MATCHED").length,
+        approved: requests.filter((r) => r.status === "APPROVED").length,
+        rejected: requests.filter((r) => r.status === "REJECTED").length,
+        cancelled: requests.filter((r) => r.status === "CANCELLED").length,
+      };
+
       return res.status(200).json({
         success: true,
         count: requests.length,
         data: requests,
+        stats: stats,
       });
     }
 
@@ -492,6 +504,20 @@ export const rejectClassChange = async (req, res) => {
     request.approvedAt = new Date();
     await request.save();
 
+    // Also update the matched request if exists
+    if (request.matchedStudent) {
+      const matchedRequest = await ClassChangeRequest.findOne({
+        requesterStudent: request.matchedStudent,
+        status: "MATCHED",
+      });
+      if (matchedRequest) {
+        matchedRequest.status = "REJECTED";
+        matchedRequest.approvedBy = req.user._id;
+        matchedRequest.approvedAt = new Date();
+        await matchedRequest.save();
+      }
+    }
+
     // Notify the student
     try {
       await createNotification({
@@ -546,6 +572,18 @@ export const cancelClassChangeRequest = async (req, res) => {
 
     request.status = "CANCELLED";
     await request.save();
+
+    // If matched, also cancel the matched request
+    if (request.matchedStudent) {
+      const matchedRequest = await ClassChangeRequest.findOne({
+        requesterStudent: request.matchedStudent,
+        status: "MATCHED",
+      });
+      if (matchedRequest) {
+        matchedRequest.status = "CANCELLED";
+        await matchedRequest.save();
+      }
+    }
 
     return res.status(200).json({
       success: true,
