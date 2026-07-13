@@ -152,7 +152,7 @@ export default function ClassChangePage() {
   async function handleAcceptMatch(volunteerId) {
     if (
       !confirm(
-        "Do you want to accept this volunteer match? This will create a mutual class change request.",
+        "Do you want to accept this volunteer match? This will automatically swap your classes.",
       )
     )
       return;
@@ -162,14 +162,51 @@ export default function ClassChangePage() {
       const response = await classChangeService.acceptMatch(volunteerId);
       toast.success(
         response.data?.message ||
-          "Match accepted successfully! Waiting for admin approval.",
+          "Class swap completed successfully! Your classes have been updated.",
       );
-      loadAll();
+
+      // Refresh all data to show updated classes
+      await loadAll();
+
+      // Show detailed success message with new class info
+      if (response.data?.data?.currentStudent?.newClass) {
+        toast.success(
+          `You have been moved to: ${response.data.data.currentStudent.newClass.className || "new class"}`,
+        );
+      }
     } catch (err) {
       const errorMsg = err.response?.data?.message || "Failed to accept match";
       toast.error(errorMsg);
     } finally {
       setAccepting(null);
+    }
+  }
+
+  async function handleApprove(id) {
+    if (!confirm("Approve this class change request?")) return;
+    setProcessing(id);
+    try {
+      await classChangeService.approve(id);
+      toast.success("Request approved!");
+      loadAll();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to approve");
+    } finally {
+      setProcessing(null);
+    }
+  }
+
+  async function handleReject(id) {
+    if (!confirm("Reject this class change request?")) return;
+    setProcessing(id);
+    try {
+      await classChangeService.reject(id);
+      toast.success("Request rejected");
+      loadAll();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to reject");
+    } finally {
+      setProcessing(null);
     }
   }
 
@@ -212,31 +249,6 @@ export default function ClassChangePage() {
           {[1, 2].map((i) => (
             <SkeletonCard key={i} />
           ))}
-        </div>
-      </div>
-    );
-  }
-
-  // Show message for admin (they should use the admin approval page)
-  if (isAdmin) {
-    return (
-      <div className="card">
-        <div className="text-center py-8">
-          <Users className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-          <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">
-            Admin Class Change Management
-          </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-2">
-            Please use the "Class Change Approvals" page to manage all requests.
-          </p>
-          <button
-            onClick={() =>
-              (window.location.href = "/admin/class-change-approvals")
-            }
-            className="btn-primary mt-4"
-          >
-            Go to Approvals
-          </button>
         </div>
       </div>
     );
@@ -378,15 +390,15 @@ export default function ClassChangePage() {
       <div>
         <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-3 flex items-center gap-2">
           <Users className="w-4 h-4" />
-          Volunteer Requests
+          {isAdmin ? "All Class Change Requests" : "Volunteer Requests"}
         </h3>
 
         {volunteers.length === 0 ? (
           <div className="card">
             <EmptyState
               icon={RefreshCw}
-              title="No Volunteers"
-              description="No volunteer requests found."
+              title="No Requests"
+              description="No class change requests found."
             />
           </div>
         ) : (
@@ -450,33 +462,70 @@ export default function ClassChangePage() {
                           {formatDate(req.createdAt)}
                         </td>
                         <td className="table-td">
-                          {canAccept ? (
-                            <button
-                              onClick={() => handleAcceptMatch(req._id)}
-                              disabled={accepting === req._id}
-                              className="btn-success text-xs px-3 py-1 flex items-center gap-1"
-                            >
-                              <UserCheck className="w-3 h-3" />
-                              {accepting === req._id
-                                ? "Accepting..."
-                                : "Accept Match"}
-                            </button>
-                          ) : isMatch &&
-                            req.status === "OPEN" &&
-                            myRequest &&
-                            myRequest.status !== "CANCELLED" &&
-                            myRequest.status !== "REJECTED" ? (
-                            <span className="text-xs text-yellow-600">
-                              You have a pending request
-                            </span>
-                          ) : isMatch && req.status !== "OPEN" ? (
-                            <span className="text-xs text-slate-400">
-                              Not Available
-                            </span>
+                          {isAdmin ? (
+                            <div className="flex items-center gap-2">
+                              {(req.status === "MATCHED" ||
+                                req.status === "OPEN") && (
+                                <>
+                                  <button
+                                    onClick={() => handleApprove(req._id)}
+                                    disabled={processing === req._id}
+                                    className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 disabled:opacity-50"
+                                    title="Approve"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleReject(req._id)}
+                                    disabled={processing === req._id}
+                                    className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 disabled:opacity-50"
+                                    title="Reject"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
+                              {req.status === "APPROVED" && (
+                                <Badge status="APPROVED" />
+                              )}
+                              {req.status === "REJECTED" && (
+                                <Badge status="REJECTED" />
+                              )}
+                              {req.status === "CANCELLED" && (
+                                <Badge status="CANCELLED" />
+                              )}
+                            </div>
                           ) : (
-                            <span className="text-xs text-slate-400">
-                              No match
-                            </span>
+                            <>
+                              {canAccept ? (
+                                <button
+                                  onClick={() => handleAcceptMatch(req._id)}
+                                  disabled={accepting === req._id}
+                                  className="btn-success text-xs px-3 py-1 flex items-center gap-1"
+                                >
+                                  <UserCheck className="w-3 h-3" />
+                                  {accepting === req._id
+                                    ? "Accepting..."
+                                    : "Accept Match"}
+                                </button>
+                              ) : isMatch &&
+                                req.status === "OPEN" &&
+                                myRequest &&
+                                myRequest.status !== "CANCELLED" &&
+                                myRequest.status !== "REJECTED" ? (
+                                <span className="text-xs text-yellow-600">
+                                  You have a pending request
+                                </span>
+                              ) : isMatch && req.status !== "OPEN" ? (
+                                <span className="text-xs text-slate-400">
+                                  Not Available
+                                </span>
+                              ) : (
+                                <span className="text-xs text-slate-400">
+                                  No match
+                                </span>
+                              )}
+                            </>
                           )}
                         </td>
                       </tr>

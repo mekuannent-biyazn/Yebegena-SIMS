@@ -9,5 +9,4 @@ export const classChangeService = {
   cancel: () => api.delete("/class-change/cancel"),
   acceptMatch: (volunteerRequestId) =>
     api.post("/class-change/accept-match", { volunteerRequestId }),
-  getAllRequests: () => api.get("/class-change/volunteers"),
 };
