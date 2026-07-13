@@ -35,7 +35,7 @@ export const createExam = async (req, res) => {
       });
     }
 
-    // Verify teacher is assigned to this class
+    // **NEW: Verify teacher is assigned to this class**
     const teacher = await Teacher.findOne({ userId: req.user._id });
     if (!teacher) {
       return res.status(403).json({
@@ -45,11 +45,10 @@ export const createExam = async (req, res) => {
     }
 
     // Check if teacher is assigned to this class
-    const isAssigned = teacher.assignedClasses.some(
-      (cId) => cId.toString() === classId,
-    );
-
-    if (!isAssigned) {
+    if (
+      !teacher.assignedClasses ||
+      !teacher.assignedClasses.includes(classId)
+    ) {
       return res.status(403).json({
         success: false,
         message: "You are not assigned to this class",
@@ -133,6 +132,9 @@ export const addExamResult = async (req, res) => {
   try {
     const { examId, studentId, score, remark } = req.body;
 
+    console.log(`📝 Adding exam result:`, { examId, studentId, score, remark });
+
+    // Validate required fields
     if (!examId || !studentId || score === undefined || score === null) {
       return res.status(400).json({
         success: false,
@@ -141,57 +143,81 @@ export const addExamResult = async (req, res) => {
     }
 
     // Get the exam
-    const exam = await Exam.findById(examId);
+    const exam = await Exam.findById(examId).populate(
+      "classId",
+      "className classType",
+    );
     if (!exam) {
+      console.log(`❌ Exam not found: ${examId}`);
       return res.status(404).json({
         success: false,
         message: "Exam not found",
       });
     }
 
+    console.log(
+      `📚 Exam: ${exam.title} - Class: ${exam.classId?.className || "Unknown"}`,
+    );
+
     // Verify teacher is assigned to the exam's class
     const teacher = await Teacher.findOne({ userId: req.user._id });
     if (!teacher) {
+      console.log(`❌ Teacher not found for user: ${req.user._id}`);
       return res.status(403).json({
         success: false,
         message: "You are not registered as a teacher",
       });
     }
 
+    console.log(`👨‍🏫 Teacher: ${teacher._id}`);
+
     // Check if teacher is assigned to the class of this exam
     const isAssignedToClass = teacher.assignedClasses.some(
-      (classId) => classId.toString() === exam.classId.toString(),
+      (classId) => classId.toString() === exam.classId._id.toString(),
     );
 
     if (!isAssignedToClass) {
+      console.log(`❌ Teacher not assigned to class: ${exam.classId._id}`);
       return res.status(403).json({
         success: false,
         message: "You are not assigned to the class of this exam",
       });
     }
 
-    // Get the student
+    console.log(`✅ Teacher is assigned to the class`);
+
+    // Get the student with populated user info
     const student = await Student.findById(studentId).populate(
       "userId",
       "fullName email phoneNumber",
     );
+
     if (!student) {
+      console.log(`❌ Student not found: ${studentId}`);
       return res.status(404).json({
         success: false,
         message: "Student not found",
       });
     }
 
+    console.log(`👨‍🎓 Student: ${student.userId?.fullName || "Unknown"}`);
+
     // Verify student is in the exam's class
     if (
       !student.assignedClass ||
-      student.assignedClass.toString() !== exam.classId.toString()
+      student.assignedClass.toString() !== exam.classId._id.toString()
     ) {
+      console.log(`❌ Student class mismatch:`, {
+        studentClass: student.assignedClass,
+        examClass: exam.classId._id,
+      });
       return res.status(400).json({
         success: false,
         message: "Student is not enrolled in the class for this exam",
       });
     }
+
+    console.log(`✅ Student is enrolled in the class`);
 
     // Validate score
     const numericScore = Number(score);
@@ -207,6 +233,7 @@ export const addExamResult = async (req, res) => {
     }
 
     const isPassed = numericScore >= exam.passingScore;
+    console.log(`📊 Score: ${numericScore} - Passed: ${isPassed}`);
 
     // Check if result already exists
     const existingResult = await ExamResult.findOne({ examId, studentId });
@@ -215,6 +242,7 @@ export const addExamResult = async (req, res) => {
     let isUpdate = false;
 
     if (existingResult) {
+      console.log(`🔄 Updating existing result: ${existingResult._id}`);
       // Update existing result
       existingResult.score = numericScore;
       existingResult.isPassed = isPassed;
@@ -224,6 +252,7 @@ export const addExamResult = async (req, res) => {
       result = existingResult;
       isUpdate = true;
     } else {
+      console.log(`➕ Creating new result`);
       // Create new result
       result = await ExamResult.create({
         examId,
@@ -235,18 +264,25 @@ export const addExamResult = async (req, res) => {
       });
     }
 
+    console.log(
+      `✅ Result ${isUpdate ? "updated" : "created"} successfully: ${result._id}`,
+    );
+
     // Send notification to student
     try {
+      const recipientId = student.userId._id || student.userId;
       await createNotification({
-        recipient: student.userId._id || student.userId,
+        recipient: recipientId,
         recipientType: "STUDENT",
         title: isUpdate ? "Exam Result Updated" : "Exam Result Published",
         message: `Your score for ${exam.title} is ${numericScore}. Status: ${isPassed ? "PASSED ✅" : "FAILED ❌"}`,
         type: isPassed ? "SUCCESS" : "WARNING",
         createdBy: req.user._id,
       });
+      console.log(`📨 Notification sent to student`);
     } catch (notifError) {
       console.error("Failed to send notification:", notifError.message);
+      // Continue even if notification fails
     }
 
     return res.status(isUpdate ? 200 : 201).json({
@@ -264,10 +300,10 @@ export const addExamResult = async (req, res) => {
       });
     }
 
-    console.error("Error adding exam result:", error);
+    console.error("❌ Error adding exam result:", error);
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: error.message || "Failed to add exam result",
     });
   }
 };
@@ -321,7 +357,7 @@ export const getExamsByClass = async (req, res) => {
     const { classId } = req.params;
     const user = req.user;
 
-    // If teacher, verify they are assigned to the class
+    // **NEW: If teacher, verify they are assigned to the class**
     const teacher = await Teacher.findOne({ userId: user._id });
     if (teacher) {
       const isAssigned = teacher.assignedClasses.some(
@@ -361,7 +397,7 @@ export const getAllExams = async (req, res) => {
     const user = req.user;
     let query = { isActive: true };
 
-    // If teacher, only get exams for their classes
+    // **NEW: If teacher, only get exams for their classes**
     const teacher = await Teacher.findOne({ userId: user._id });
     if (
       teacher &&
@@ -400,7 +436,7 @@ export const checkExamResult = async (req, res) => {
       });
     }
 
-    // Verify teacher has access to this exam
+    // **NEW: Verify teacher has access to this exam**
     const teacher = await Teacher.findOne({ userId: req.user._id });
     if (teacher) {
       const exam = await Exam.findById(examId);
@@ -442,15 +478,6 @@ export const getEligibleStudentsForExam = async (req, res) => {
   try {
     const { examId } = req.params;
 
-    // Validate examId
-    if (!examId) {
-      return res.status(400).json({
-        success: false,
-        message: "Exam ID is required",
-      });
-    }
-
-    // Find the exam
     const exam = await Exam.findById(examId);
     if (!exam) {
       return res.status(404).json({
@@ -459,24 +486,18 @@ export const getEligibleStudentsForExam = async (req, res) => {
       });
     }
 
-    // Verify teacher is assigned to the class
+    // **NEW: Verify teacher is assigned to the class**
     const teacher = await Teacher.findOne({ userId: req.user._id });
-    if (!teacher) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not registered as a teacher",
-      });
-    }
-
-    const isAssigned = teacher.assignedClasses.some(
-      (cId) => cId.toString() === exam.classId.toString(),
-    );
-
-    if (!isAssigned) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not assigned to the class of this exam",
-      });
+    if (teacher) {
+      const isAssigned = teacher.assignedClasses.some(
+        (cId) => cId.toString() === exam.classId.toString(),
+      );
+      if (!isAssigned) {
+        return res.status(403).json({
+          success: false,
+          message: "You are not assigned to the class of this exam",
+        });
+      }
     }
 
     // Get all students in the exam's class
