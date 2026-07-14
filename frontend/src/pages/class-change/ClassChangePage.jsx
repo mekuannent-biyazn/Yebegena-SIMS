@@ -9,7 +9,7 @@ import {
   Edit,
   Trash2,
   ArrowRight,
-  Swap,
+  ArrowLeftRight,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { classChangeService } from "../../services/classChangeService";
@@ -472,7 +472,7 @@ export default function ClassChangePage() {
                     disabled={processing === myRequest._id}
                     className="btn-success text-sm px-6 py-2.5 flex items-center gap-2 font-semibold shadow-lg hover:shadow-xl transition-all"
                   >
-                    <Swap
+                    <ArrowLeftRight
                       className={`w-4 h-4 ${
                         processing === myRequest._id ? "animate-spin" : ""
                       }`}
