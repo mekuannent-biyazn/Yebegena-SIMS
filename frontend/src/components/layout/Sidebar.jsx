@@ -1,3 +1,4 @@
+// src/components/layout/Sidebar.jsx
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -21,6 +22,7 @@ import {
 import { useAuthStore } from "../../store/authStore";
 import { useI18nStore } from "../../store/i18nStore";
 import { ROLES } from "../../constants";
+import Logo from "../ui/Logo";
 
 export default function Sidebar({ isOpen, setIsOpen, isDesktop }) {
   const user = useAuthStore((s) => s.user);
@@ -34,7 +36,6 @@ export default function Sidebar({ isOpen, setIsOpen, isDesktop }) {
     { to: "/teachers", icon: GraduationCap, label: t("teachers") },
     { to: "/classes", icon: BookOpen, label: t("classes") },
     { to: "/schedules", icon: Calendar, label: t("schedules") },
-    // { to: "/exams", icon: FileText, label: t("exams") },
     { to: "/payments", icon: CreditCard, label: t("payments") },
     { to: "/class-change", icon: RefreshCw, label: t("classChange") },
     {
@@ -50,16 +51,10 @@ export default function Sidebar({ isOpen, setIsOpen, isDesktop }) {
 
   // Teacher links
   const teacherLinks = [
-    // { to: "/dashboard", icon: LayoutDashboard, label: t("dashboard") },
-    // { to: "/schedules", icon: Calendar, label: t("schedules") },
-    // { to: "/exams", icon: FileText, label: t("exams") },
-    // { to: "/notifications", icon: Bell, label: t("notifications") },
-
     { to: "/dashboard", icon: LayoutDashboard, label: t("dashboard") },
     { to: "/teacher/classes", icon: BookOpen, label: "My Classes" },
     { to: "/teacher/exams", icon: FileText, label: t("exams") },
     { to: "/notifications", icon: Bell, label: t("notifications") },
-    // { to: "/exams", icon: FileText, label: t("exams") },
   ];
 
   // Student links
@@ -135,26 +130,15 @@ export default function Sidebar({ isOpen, setIsOpen, isDesktop }) {
       )}
 
       <aside className={getSidebarClasses()}>
-        {/* Header - Hide text when sidebar is collapsed on desktop */}
+        {/* Header with Logo */}
         <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between min-h-[72px]">
           <div
             className={`${!isOpen && isDesktop ? "hidden" : "block"} flex-1 min-w-0`}
           >
-            <h1
-              className={`font-bold bg-gradient-to-r from-primary-600 to-primary-800 bg-clip-text text-transparent whitespace-nowrap transition-all duration-300 ${
-                isOpen ? "text-lg" : "text-base"
-              }`}
-            >
-              {isOpen ? "Yebegena SIMS" : "YS"}
-            </h1>
-            {isOpen && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 whitespace-nowrap">
-                {user?.role === ROLES.ADMIN && "Admin Panel"}
-                {user?.role === ROLES.TEACHER && "Teacher Portal"}
-                {(user?.role === ROLES.FRESH_STUDENT ||
-                  user?.role === ROLES.ADVANCED_STUDENT) &&
-                  "Student Portal"}
-              </p>
+            {isOpen ? (
+              <Logo variant="full" className="justify-start" />
+            ) : (
+              <Logo variant="icon" className="mx-auto" />
             )}
           </div>
 

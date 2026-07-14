@@ -14,15 +14,24 @@ export const useAuthStore = create((set, get) => ({
   user: getInitialUser(),
   token: localStorage.getItem("token") || null,
   isLoading: false,
+  error: null,
 
   login: async (phoneNumber, password) => {
-    set({ isLoading: true });
-    const { data } = await api.post("/login", { phoneNumber, password });
-    const { token, user, mustChangePassword } = data;
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(user));
-    set({ token, user, isLoading: false });
-    return { mustChangePassword };
+    set({ isLoading: true, error: null });
+    try {
+      const { data } = await api.post("/login", { phoneNumber, password });
+      const { token, user, mustChangePassword } = data;
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+      set({ token, user, isLoading: false });
+      return { mustChangePassword };
+    } catch (error) {
+      set({
+        isLoading: false,
+        error: error.response?.data?.message || "Login failed",
+      });
+      throw error;
+    }
   },
 
   register: async (payload) => {
