@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar } from "lucide-react";
+import { Calendar, User, BookOpen } from "lucide-react";
 import toast from "react-hot-toast";
 import { scheduleService } from "../../services/scheduleService";
 import { studentService } from "../../services/studentService";
@@ -43,6 +43,7 @@ export default function MySchedulePage() {
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [classInfo, setClassInfo] = useState(null);
+  const [studentData, setStudentData] = useState(null);
 
   useEffect(() => {
     async function loadData() {
@@ -50,47 +51,69 @@ export default function MySchedulePage() {
       try {
         // Get student profile
         const response = await studentService.getProfile();
-        console.log("📊 Student Profile Response:", response.data);
+        console.log("📊 Full API Response:", response);
+        console.log("📊 Response Data:", response.data);
 
-        // Handle different response structures
-        let studentData = response.data;
+        // Extract student data - handle different response structures
+        let student = response.data?.data || response.data;
+        console.log("📊 Extracted Student:", student);
 
-        // If response has a data wrapper, extract it
-        if (response.data?.data) {
-          studentData = response.data.data;
-        }
+        // Store full student data for debugging
+        setStudentData(student);
 
-        console.log("📊 Student Data:", studentData);
+        // Check if student has assignedClass
+        console.log("📊 assignedClass in student:", student.assignedClass);
 
-        // Get the assigned class - handle both populated and unpopulated
+        // If assignedClass is a string (ID), we need to fetch the class separately
         let classId = null;
         let classObj = null;
 
-        if (studentData.assignedClass) {
+        if (student.assignedClass) {
           if (
-            typeof studentData.assignedClass === "object" &&
-            studentData.assignedClass._id
+            typeof student.assignedClass === "object" &&
+            student.assignedClass._id
           ) {
             // Class is populated
-            classId = studentData.assignedClass._id;
-            classObj = studentData.assignedClass;
-          } else if (typeof studentData.assignedClass === "string") {
+            classId = student.assignedClass._id;
+            classObj = student.assignedClass;
+            console.log("✅ Class is populated:", classObj);
+          } else if (typeof student.assignedClass === "string") {
             // Class is just an ID
-            classId = studentData.assignedClass;
+            classId = student.assignedClass;
+            console.log("✅ Class is an ID:", classId);
+          } else {
+            console.warn(
+              "⚠️ Unexpected assignedClass format:",
+              student.assignedClass,
+            );
           }
+        } else {
+          console.warn("⚠️ No assignedClass field in student data");
+          console.log("📊 Full student object keys:", Object.keys(student));
         }
 
-        console.log("📊 Class ID:", classId);
-        console.log("📊 Class Object:", classObj);
-
         if (!classId) {
-          console.warn("⚠️ No class assigned to this student");
+          console.error("❌ No class assigned to this student");
           setLoading(false);
           return;
         }
 
         // Set class info
-        setClassInfo(classObj || { _id: classId, className: "Assigned Class" });
+        if (classObj) {
+          setClassInfo(classObj);
+        } else {
+          // If class wasn't populated, fetch it separately
+          try {
+            const classResponse = await fetch(`/api/classes/${classId}`);
+            const classData = await classResponse.json();
+            setClassInfo(
+              classData.data || { _id: classId, className: "Assigned Class" },
+            );
+          } catch (err) {
+            console.error("Error fetching class:", err);
+            setClassInfo({ _id: classId, className: "Assigned Class" });
+          }
+        }
 
         // Fetch schedules for this class
         const scheduleResponse = await scheduleService.getByClass(classId);
@@ -104,6 +127,7 @@ export default function MySchedulePage() {
         }
       } catch (error) {
         console.error("❌ Error loading schedule data:", error);
+        console.error("❌ Error details:", error.response?.data);
         toast.error(t("loadingFailed") || "Failed to load schedule");
       } finally {
         setLoading(false);
@@ -117,8 +141,9 @@ export default function MySchedulePage() {
     return acc;
   }, {});
 
-  const activeDays = DAYS_OF_WEEK.filter((d) => grouped[d].length > 0);
+  const activeDays = DAYS_OF_WEEK.filter((d) => grouped[d]?.length > 0);
 
+  // Show loading state
   if (loading) {
     return (
       <div className="space-y-4">
@@ -131,14 +156,45 @@ export default function MySchedulePage() {
     );
   }
 
+  // Show message if no class assigned
   if (!classInfo) {
     return (
       <div className="card">
-        <EmptyState
-          icon={Calendar}
-          title="No Class Assigned"
-          description="You haven't been assigned to a class yet. Please contact your admin."
-        />
+        <div className="text-center py-12">
+          <div className="w-16 h-16 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+            <BookOpen className="w-8 h-8 text-yellow-600 dark:text-yellow-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">
+            No Class Assigned
+          </h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
+            You haven't been assigned to a class yet. Please contact your
+            administrator to get assigned to a class.
+          </p>
+          {studentData && (
+            <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg text-left">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Debug Info - Student ID: {studentData._id}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Student Name: {studentData.fullName}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Role: {studentData.role}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                assignedClass field:{" "}
+                {studentData.assignedClass ? "Present" : "Missing"}
+              </p>
+            </div>
+          )}
+          <button
+            onClick={() => window.location.reload()}
+            className="btn-primary mt-4"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
     );
   }
