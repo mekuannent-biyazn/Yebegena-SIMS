@@ -13,6 +13,16 @@ export const studentService = {
   getStats: () => api.get("/students/stats"),
   getAll: () => api.get("/students/students"),
   getById: (id) => api.get(`/students/${id}`),
+
+  // FIXED: Get student profile by user ID
+  getStudentByUserId: (userId) => api.get(`/students/user/${userId}`),
+
+  // FIXED: Get current student profile
+  getMyStudentProfile: () => api.get("/students/me"),
+
+  // Keep this for backward compatibility but it returns USER data
+  getProfile: () => api.get("/profile"),
+
   updateProfile: (formData) =>
     api.put("/profile", formData, {
       headers: {
@@ -20,5 +30,4 @@ export const studentService = {
       },
     }),
   deleteProfilePicture: () => api.delete("/profile/picture"),
-  getProfile: () => api.get("/profile"),
 };
