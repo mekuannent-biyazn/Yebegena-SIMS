@@ -12,12 +12,12 @@ import {
 
 const router = express.Router();
 
-router.post("/", protect, authorize("ADMIN"), createSchedule);
+router.get("/class/:classId", protect, getClassSchedules);
 
 router.post("/tutorial", protect, authorize("TEACHER"), createTutorialSchedule);
 
-router.get("/class/:classId", protect, getClassSchedules);
-
 router.put("/:id", protect, authorize("ADMIN", "TEACHER"), updateSchedule);
+
+router.post("/", protect, authorize("ADMIN"), createSchedule);
 
 export default router;
