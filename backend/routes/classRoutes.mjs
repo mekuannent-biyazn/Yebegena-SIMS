@@ -11,9 +11,9 @@ import {
 
 const router = express.Router();
 
-router.post("/", protect, authorize("ADMIN"), createClass);
-
 router.get("/", protect, getAllClasses);
+
+router.post("/", protect, authorize("ADMIN"), createClass);
 
 router.put("/assign-teacher", protect, authorize("ADMIN"), assignTeacher);
 

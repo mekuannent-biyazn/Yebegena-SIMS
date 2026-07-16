@@ -10,9 +10,20 @@ export const getMyProfile = async (req, res) => {
     const student = await Student.findOne({
       userId: req.user._id,
     })
+      .populate({
+        path: "assignedClass",
+        select:
+          "className classType teacher maxStudents currentStudents isActive",
+        populate: {
+          path: "teacher",
+          populate: {
+            path: "userId",
+            select: "fullName email phoneNumber",
+          },
+        },
+      })
       .populate("kflat")
-      .populate("kflatRole")
-      .populate("assignedClass");
+      .populate("kflatRole");
 
     if (!student) {
       return res.status(404).json({
@@ -21,11 +32,22 @@ export const getMyProfile = async (req, res) => {
       });
     }
 
+    // Log for debugging
+    console.log("📊 Student Profile Found:", {
+      id: student._id,
+      name: student.fullName,
+      assignedClass: student.assignedClass
+        ? student.assignedClass.className
+        : "None",
+      classId: student.assignedClass ? student.assignedClass._id : null,
+    });
+
     res.status(200).json({
       success: true,
       data: student,
     });
   } catch (error) {
+    console.error("❌ Error in getMyProfile:", error);
     res.status(500).json({
       success: false,
       message: error.message,
