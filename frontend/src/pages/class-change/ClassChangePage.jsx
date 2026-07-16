@@ -106,7 +106,7 @@ export default function ClassChangePage() {
     return myRequest.status === "OPEN";
   };
 
-  // Check if student has a matched request waiting for swap
+  // Check if student has a matched request waiting for admin approval
   const hasMatchedRequest = () => {
     if (!myRequest) return false;
     return myRequest.status === "MATCHED" && myRequest.matchedStudent;
@@ -157,11 +157,11 @@ export default function ClassChangePage() {
     }
   }
 
-  // Handle accepting a volunteer match - IMMEDIATE SWAP
+  // Handle accepting a volunteer match - Creates match, waits for admin approval
   async function handleAcceptMatch(volunteerId) {
     if (
       !confirm(
-        "Do you want to accept this volunteer match? This will automatically swap your classes.",
+        "Do you want to accept this volunteer match? This will create a match that needs admin approval.",
       )
     )
       return;
@@ -170,17 +170,10 @@ export default function ClassChangePage() {
     try {
       const response = await classChangeService.acceptMatch(volunteerId);
 
-      // Update the current class immediately from the response
-      if (response.data?.data?.currentStudent?.newClass) {
-        setCurrentClass(response.data.data.currentStudent.newClass);
-        toast.success(
-          `✅ Class swapped! You are now in: ${response.data.data.currentStudent.newClass.className}`,
-        );
-      } else {
-        toast.success(
-          response.data?.message || "Class swap completed successfully!",
-        );
-      }
+      toast.success(
+        response.data?.message ||
+          "✅ Match accepted! Waiting for admin approval.",
+      );
 
       // Refresh all data to show updated state
       await loadAll();
@@ -189,56 +182,6 @@ export default function ClassChangePage() {
       toast.error(errorMsg);
     } finally {
       setAccepting(null);
-    }
-  }
-
-  // Handle completing the swap for matched requests
-  async function handleCompleteSwap() {
-    if (!myRequest?.matchedStudent) {
-      toast.error("No match found to swap with");
-      return;
-    }
-
-    // Find the volunteer request that matches with the current student
-    const matchedVolunteer = volunteers.find(
-      (v) =>
-        v.status === "OPEN" &&
-        v.requesterStudent?._id === myRequest?.matchedStudent?._id &&
-        v.desiredClass?._id === currentClass?._id,
-    );
-
-    if (!matchedVolunteer) {
-      toast.error("No matching volunteer found to swap with");
-      return;
-    }
-
-    if (
-      !confirm(
-        `Are you sure you want to swap classes with ${myRequest.matchedStudent?.userId?.fullName || "your match"}? This action cannot be undone.`,
-      )
-    )
-      return;
-
-    setProcessing(myRequest._id);
-    try {
-      const response = await classChangeService.acceptMatch(
-        matchedVolunteer._id,
-      );
-
-      if (response.data?.data?.currentStudent?.newClass) {
-        setCurrentClass(response.data.data.currentStudent.newClass);
-        toast.success(
-          `✅ Class swapped! You are now in: ${response.data.data.currentStudent.newClass.className}`,
-        );
-      }
-
-      toast.success("🎉 Classes swapped successfully!");
-      await loadAll();
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || "Failed to swap classes";
-      toast.error(errorMsg);
-    } finally {
-      setProcessing(null);
     }
   }
 
@@ -351,7 +294,7 @@ export default function ClassChangePage() {
         <div
           className={`card ${
             myRequest?.status === "APPROVED"
-              ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"
+              ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
               : myRequest?.status === "MATCHED"
                 ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800"
                 : "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
@@ -364,13 +307,13 @@ export default function ClassChangePage() {
                 {currentClass.className || "N/A"}
               </span>
               {myRequest?.status === "APPROVED" && (
-                <span className="ml-2 text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-0.5 rounded-full">
+                <span className="ml-2 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full">
                   ✅ Updated
                 </span>
               )}
               {myRequest?.status === "MATCHED" && (
                 <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 px-2 py-0.5 rounded-full">
-                  🔄 Match Pending
+                  ⏳ Pending Admin Approval
                 </span>
               )}
             </p>
@@ -421,6 +364,11 @@ export default function ClassChangePage() {
                 Status
               </p>
               <Badge status={myRequest.status} />
+              {myRequest.status === "MATCHED" && (
+                <p className="text-xs text-yellow-600 mt-1">
+                  ⏳ Waiting for admin approval
+                </p>
+              )}
             </div>
             <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3">
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
@@ -451,7 +399,7 @@ export default function ClassChangePage() {
               </div>
             )}
 
-            {/* Matched Status with Swap Button - THIS IS THE KEY SECTION */}
+            {/* Matched Status - Waiting for Admin Approval */}
             {myRequest.status === "MATCHED" && myRequest.matchedStudent && (
               <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 col-span-2 border-2 border-yellow-200 dark:border-yellow-800">
                 <div className="flex items-center justify-between">
@@ -467,37 +415,29 @@ export default function ClassChangePage() {
                       Status: <Badge status="MATCHED" />
                     </p>
                   </div>
-                  <button
-                    onClick={handleCompleteSwap}
-                    disabled={processing === myRequest._id}
-                    className="btn-success text-sm px-6 py-2.5 flex items-center gap-2 font-semibold shadow-lg hover:shadow-xl transition-all"
-                  >
-                    <ArrowLeftRight
-                      className={`w-4 h-4 ${
-                        processing === myRequest._id ? "animate-spin" : ""
-                      }`}
-                    />
-                    {processing === myRequest._id ? "Swapping..." : "Swap Now"}
-                  </button>
+                  <div className="text-right">
+                    <p className="text-xs text-yellow-600 font-medium">
+                      ⏳ Pending Admin Approval
+                    </p>
+                    <p className="text-xs text-yellow-500 mt-1">
+                      Admin needs to approve this swap
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
-                  ⚡ Click "Swap Now" to instantly exchange classes with your
-                  match.
-                </p>
               </div>
             )}
 
             {/* Approved Status - Class Already Swapped */}
             {myRequest.status === "APPROVED" && (
-              <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-3 col-span-2 border border-emerald-200 dark:border-emerald-800">
-                <p className="text-xs text-emerald-600 dark:text-emerald-400">
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 col-span-2 border border-green-200 dark:border-green-800">
+                <p className="text-xs text-green-600 dark:text-green-400">
                   ✅ Class swap completed! You are now in:{" "}
                   <span className="font-bold">
                     {currentClass?.className || "new class"}
                   </span>
                 </p>
                 {myRequest.matchedStudent && (
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                     Swapped with: {myRequest.matchedStudent?.userId?.fullName}
                   </p>
                 )}
@@ -610,8 +550,8 @@ export default function ClassChangePage() {
                               >
                                 <UserCheck className="w-3 h-3" />
                                 {accepting === req._id
-                                  ? "Swapping..."
-                                  : "Accept & Swap"}
+                                  ? "Processing..."
+                                  : "Accept Match"}
                               </button>
                             ) : isMatch &&
                               req.status === "OPEN" &&
@@ -648,14 +588,14 @@ export default function ClassChangePage() {
           <ArrowRight className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-              ⚡ Instant Class Swapping
+              📋 Class Change Process
             </p>
             <ul className="text-xs text-blue-600 dark:text-blue-400 mt-1 list-disc list-inside space-y-1">
               <li>Create a request for the class you want</li>
               <li>Find a volunteer who wants your class (Perfect Match 🎯)</li>
-              <li>Click "Accept & Swap" to instantly exchange classes</li>
-              <li>Both students are immediately moved to their new classes</li>
-              <li>No admin approval needed - instant class change!</li>
+              <li>Click "Accept Match" to create a match</li>
+              <li>Admin approves the match and swaps classes</li>
+              <li>Both students are moved to their new classes</li>
             </ul>
           </div>
         </div>

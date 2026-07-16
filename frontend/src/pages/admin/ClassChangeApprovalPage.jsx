@@ -43,7 +43,7 @@ export default function ClassChangeApprovalPage() {
       const data = response.data?.data || [];
       setRequests(data);
 
-      // Calculate stats from response or compute
+      // Calculate stats from response
       if (response.data?.stats) {
         setStats(response.data.stats);
       } else {
@@ -101,9 +101,10 @@ export default function ClassChangeApprovalPage() {
 
     setProcessing(id);
     try {
-      await classChangeService.approve(id);
+      const response = await classChangeService.approve(id);
       toast.success(
-        "Class change approved successfully! Students have been notified.",
+        response.data?.message ||
+          "Class change approved successfully! Students have been notified.",
       );
       loadRequests();
     } catch (err) {
@@ -140,12 +141,12 @@ export default function ClassChangeApprovalPage() {
       },
       MATCHED: {
         color:
-          "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-        label: "Matched",
+          "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+        label: "Pending Approval",
       },
       APPROVED: {
         color:
-          "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+          "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
         label: "Approved",
       },
       REJECTED: {
@@ -154,7 +155,7 @@ export default function ClassChangeApprovalPage() {
       },
       CANCELLED: {
         color:
-          "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+          "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
         label: "Cancelled",
       },
     };
@@ -174,7 +175,7 @@ export default function ClassChangeApprovalPage() {
             className="btn-success text-xs px-3 py-1.5 flex items-center gap-1"
           >
             <Check className="w-3 h-3" />
-            {processing === request._id ? "Processing..." : "Approve"}
+            {processing === request._id ? "Processing..." : "Approve Swap"}
           </button>
           <button
             onClick={() => handleReject(request._id)}
@@ -207,7 +208,7 @@ export default function ClassChangeApprovalPage() {
   };
 
   if (loading) {
-    return <SkeletonTable rows={5} cols={6} />;
+    return <SkeletonTable rows={5} cols={7} />;
   }
 
   return (
@@ -219,7 +220,7 @@ export default function ClassChangeApprovalPage() {
             Class Change Approvals
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Review and manage class change requests
+            Review and approve matched class change requests
           </p>
         </div>
         <button
@@ -240,23 +241,23 @@ export default function ClassChangeApprovalPage() {
             {stats.total}
           </p>
         </div>
-        <div className="card bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
-          <p className="text-xs text-yellow-600 dark:text-yellow-400">Open</p>
-          <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">
+        <div className="card bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+          <p className="text-xs text-blue-600 dark:text-blue-400">Open</p>
+          <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
             {stats.open}
           </p>
         </div>
-        <div className="card bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-          <p className="text-xs text-green-600 dark:text-green-400">Matched</p>
-          <p className="text-2xl font-bold text-green-700 dark:text-green-300">
+        <div className="card bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+          <p className="text-xs text-yellow-600 dark:text-yellow-400">
+            Pending Approval
+          </p>
+          <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">
             {stats.matched}
           </p>
         </div>
-        <div className="card bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800">
-          <p className="text-xs text-emerald-600 dark:text-emerald-400">
-            Approved
-          </p>
-          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+        <div className="card bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+          <p className="text-xs text-green-600 dark:text-green-400">Approved</p>
+          <p className="text-2xl font-bold text-green-700 dark:text-green-300">
             {stats.approved}
           </p>
         </div>
@@ -301,7 +302,7 @@ export default function ClassChangeApprovalPage() {
                     <tr
                       key={req._id}
                       className={`border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 last:border-0 ${
-                        isMatched ? "bg-green-50/50 dark:bg-green-900/5" : ""
+                        isMatched ? "bg-yellow-50/50 dark:bg-yellow-900/5" : ""
                       }`}
                     >
                       <td className="table-td">
@@ -343,6 +344,11 @@ export default function ClassChangeApprovalPage() {
                           status={req.status}
                           className={statusInfo.color}
                         />
+                        {req.status === "MATCHED" && (
+                          <p className="text-xs text-yellow-600 mt-1">
+                            ⏳ Waiting for admin approval
+                          </p>
+                        )}
                       </td>
                       <td className="table-td text-slate-500 dark:text-slate-400">
                         {formatDate(req.createdAt)}
@@ -367,9 +373,9 @@ export default function ClassChangeApprovalPage() {
             </p>
             <ul className="text-xs text-blue-600 dark:text-blue-400 mt-1 list-disc list-inside space-y-1">
               <li>Students create class change requests</li>
-              <li>System automatically finds matching volunteers</li>
+              <li>Students can find and accept matches with volunteers</li>
               <li>When matched, both students are notified</li>
-              <li>Admin approves the match to swap classes</li>
+              <li>Admin must approve the match to swap classes</li>
               <li>Both students receive confirmation notifications</li>
             </ul>
           </div>
