@@ -48,12 +48,52 @@ export default function MySchedulePage() {
     async function loadData() {
       setLoading(true);
       try {
-        // Get student profile to get class ID
-        const { data: profileData } = await studentService.getProfile();
-        const student = profileData.data || profileData;
+        let student = null;
+        const userId =
+          localStorage.getItem("userId") || sessionStorage.getItem("userId");
 
-        // Extract class ID from profile
-        const classId = student?.assignedClass?._id || student?.assignedClass;
+        // Try multiple methods to get student data
+        try {
+          // Method 1: Get student by user ID
+          const response = await studentService.getStudentByUserId(userId);
+          console.log("Schedule - Student by user ID:", response);
+          student = response.data?.data || response.data;
+        } catch (err) {
+          console.log("Method 1 failed, trying method 2...");
+        }
+
+        if (!student) {
+          try {
+            // Method 2: Get my student profile
+            const response = await studentService.getMyStudentProfile();
+            console.log("Schedule - My student profile:", response);
+            student = response.data?.data || response.data;
+          } catch (err) {
+            console.log("Method 2 failed, trying method 3...");
+          }
+        }
+
+        if (!student) {
+          try {
+            // Method 3: Fallback to profile
+            const response = await studentService.getProfile();
+            console.log("Schedule - Profile (fallback):", response);
+            student = response.data?.data || response.data;
+          } catch (err) {
+            console.log("Method 3 failed...");
+          }
+        }
+
+        console.log("Schedule - Final student data:", student);
+
+        if (!student) {
+          console.error("No student data found");
+          setLoading(false);
+          return;
+        }
+
+        // Extract class ID from the student data
+        const classId = student?.assignedClass?._id;
 
         if (!classId) {
           console.warn("No class assigned to this student");
@@ -61,14 +101,16 @@ export default function MySchedulePage() {
           return;
         }
 
-        // Get class info
-        setClassInfo(student?.assignedClass);
+        // Store class info for display
+        setClassInfo(student.assignedClass);
 
         // Fetch schedules using the class ID
-        const response = await scheduleService.getByClass(classId);
+        const schedulesResponse = await scheduleService.getByClass(classId);
+        console.log("Schedule - Schedules response:", schedulesResponse);
 
-        // Extract schedules from response
-        const schedulesData = response?.data?.data || response?.data || [];
+        // Extract schedules from response: { success: true, count: 2, data: [...] }
+        const schedulesData =
+          schedulesResponse?.data?.data || schedulesResponse?.data || [];
         setSchedules(schedulesData);
 
         if (schedulesData.length === 0) {
@@ -127,7 +169,13 @@ export default function MySchedulePage() {
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {classInfo?.className && `Class: ${classInfo.className}`}
+            {classInfo?.classType && ` (${classInfo.classType})`}
           </p>
+          {classInfo?.teacher?.userId?.fullName && (
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+              Teacher: {classInfo.teacher.userId.fullName}
+            </p>
+          )}
         </div>
         <div className="badge bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
           {schedules.length} sessions/week

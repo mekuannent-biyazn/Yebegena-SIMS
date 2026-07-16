@@ -55,14 +55,42 @@ export default function ProfilePage() {
     }
 
     try {
-      const response = await studentService.getProfile();
-      console.log("Full response:", response);
+      let studentData = null;
 
-      // Extract the student data from the response
-      // The response structure is: { success: true, data: { studentData } }
-      const studentData = response.data?.data || response.data;
+      // Try to get student data using the user ID
+      if (user?._id) {
+        try {
+          const response = await studentService.getStudentByUserId(user._id);
+          console.log("Student by user ID response:", response);
+          studentData = response.data?.data || response.data;
+        } catch (err) {
+          console.log(
+            "Could not fetch student by user ID, trying other methods...",
+          );
+        }
+      }
 
-      console.log("Student data:", studentData);
+      // If that fails, try getMyStudentProfile
+      if (!studentData) {
+        try {
+          const response = await studentService.getMyStudentProfile();
+          console.log("My student profile response:", response);
+          studentData = response.data?.data || response.data;
+        } catch (err) {
+          console.log(
+            "Could not fetch my student profile, trying profile endpoint...",
+          );
+        }
+      }
+
+      // If both fail, fallback to profile endpoint
+      if (!studentData) {
+        const response = await studentService.getProfile();
+        console.log("Profile response (fallback):", response);
+        studentData = response.data?.data || response.data;
+      }
+
+      console.log("Final student data:", studentData);
       setProfile(studentData);
     } catch (error) {
       console.error("Load profile error:", error);
@@ -232,6 +260,10 @@ export default function ProfilePage() {
 
   if (loading) return <SkeletonCard />;
 
+  // Check if we have student data (has studentStatus field)
+  const hasStudentData =
+    profile && (profile.studentStatus || profile.assignedClass);
+
   return (
     <div className="max-w-2xl mx-auto space-y-6">
       {/* Profile header */}
@@ -391,7 +423,7 @@ export default function ProfilePage() {
       )}
 
       {/* Student-specific info */}
-      {isStudent && profile && (
+      {isStudent && hasStudentData && (
         <>
           <div className="card">
             <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-4">
@@ -561,6 +593,20 @@ export default function ProfilePage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Show message if profile doesn't have student data */}
+      {isStudent && profile && !hasStudentData && (
+        <div className="card">
+          <div className="text-center py-8">
+            <p className="text-slate-500 dark:text-slate-400">
+              Student profile data not found. Please contact your admin.
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+              Data received: {JSON.stringify(profile, null, 2)}
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Delete Picture Confirmation Modal */}
