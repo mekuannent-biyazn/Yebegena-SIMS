@@ -53,47 +53,58 @@ export default function MySchedulePage() {
           localStorage.getItem("userId") || sessionStorage.getItem("userId");
 
         // Try multiple methods to get student data
+        // Method 1: Get student by user ID
         try {
-          // Method 1: Get student by user ID
           const response = await studentService.getStudentByUserId(userId);
           console.log("Schedule - Student by user ID:", response);
-          student = response.data?.data || response.data;
+          const data = response.data?.data || response.data;
+          // Check if data has studentData property (nested)
+          student = data?.studentData || data;
         } catch (err) {
           console.log("Method 1 failed, trying method 2...");
         }
 
-        if (!student) {
+        if (!student || student._id === userId) {
           try {
             // Method 2: Get my student profile
             const response = await studentService.getMyStudentProfile();
             console.log("Schedule - My student profile:", response);
-            student = response.data?.data || response.data;
+            const data = response.data?.data || response.data;
+            // Check if data has studentData property (nested)
+            student = data?.studentData || data;
           } catch (err) {
             console.log("Method 2 failed, trying method 3...");
           }
         }
 
-        if (!student) {
+        if (!student || student._id === userId) {
           try {
             // Method 3: Fallback to profile
             const response = await studentService.getProfile();
             console.log("Schedule - Profile (fallback):", response);
-            student = response.data?.data || response.data;
+            const data = response.data?.data || response.data;
+            // Check if data has studentData property (nested)
+            student = data?.studentData || data;
           } catch (err) {
             console.log("Method 3 failed...");
           }
         }
 
+        // If student data is still user data, check if it has studentData property
+        if (student && student._id === userId && student.studentData) {
+          student = student.studentData;
+        }
+
         console.log("Schedule - Final student data:", student);
 
-        if (!student) {
+        if (!student || !student.studentStatus) {
           console.error("No student data found");
           setLoading(false);
           return;
         }
 
         // Extract class ID from the student data
-        const classId = student?.assignedClass?._id;
+        const classId = student?.assignedClass?._id || student?.assignedClass;
 
         if (!classId) {
           console.warn("No class assigned to this student");

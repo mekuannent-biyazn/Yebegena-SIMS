@@ -57,12 +57,15 @@ export default function ProfilePage() {
     try {
       let studentData = null;
 
-      // Try to get student data using the user ID
+      // Try multiple methods to get student data
+      // Method 1: Try to get student by user ID
       if (user?._id) {
         try {
           const response = await studentService.getStudentByUserId(user._id);
           console.log("Student by user ID response:", response);
-          studentData = response.data?.data || response.data;
+          const data = response.data?.data || response.data;
+          // Check if data has studentData property (nested)
+          studentData = data?.studentData || data;
         } catch (err) {
           console.log(
             "Could not fetch student by user ID, trying other methods...",
@@ -70,12 +73,14 @@ export default function ProfilePage() {
         }
       }
 
-      // If that fails, try getMyStudentProfile
+      // Method 2: Try getMyStudentProfile
       if (!studentData) {
         try {
           const response = await studentService.getMyStudentProfile();
           console.log("My student profile response:", response);
-          studentData = response.data?.data || response.data;
+          const data = response.data?.data || response.data;
+          // Check if data has studentData property (nested)
+          studentData = data?.studentData || data;
         } catch (err) {
           console.log(
             "Could not fetch my student profile, trying profile endpoint...",
@@ -83,11 +88,25 @@ export default function ProfilePage() {
         }
       }
 
-      // If both fail, fallback to profile endpoint
+      // Method 3: Fallback to profile endpoint
       if (!studentData) {
-        const response = await studentService.getProfile();
-        console.log("Profile response (fallback):", response);
-        studentData = response.data?.data || response.data;
+        try {
+          const response = await studentService.getProfile();
+          console.log("Profile response (fallback):", response);
+          const data = response.data?.data || response.data;
+          // Check if data has studentData property (nested)
+          studentData = data?.studentData || data;
+        } catch (err) {
+          console.log("All methods failed...");
+        }
+      }
+
+      // If studentData has _id starting with '6a47bda0' it's user data, try to extract studentData
+      if (studentData && studentData._id === user?._id) {
+        // This is user data, check if it has studentData property
+        if (studentData.studentData) {
+          studentData = studentData.studentData;
+        }
       }
 
       console.log("Final student data:", studentData);
