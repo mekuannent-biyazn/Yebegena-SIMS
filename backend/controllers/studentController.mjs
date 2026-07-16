@@ -7,6 +7,11 @@ import { createNotification } from "../services/notificationService.mjs";
 
 export const getMyProfile = async (req, res) => {
   try {
+    // First, find the student without populating to see what's there
+    const studentRaw = await Student.findOne({
+      userId: req.user._id,
+    });
+
     const student = await Student.findOne({
       userId: req.user._id,
     })
@@ -32,23 +37,15 @@ export const getMyProfile = async (req, res) => {
       });
     }
 
-    // Log for debugging
-    console.log("📊 Student Profile Found:", {
-      id: student._id,
-      name: student.fullName,
-      assignedClass: student.assignedClass
-        ? student.assignedClass.className
-        : "None",
-      classId: student.assignedClass ? student.assignedClass._id : null,
-    });
+    // Convert to object and explicitly add assignedClass if it exists
+    const studentObject = student.toObject();
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      data: student,
+      data: studentObject,
     });
   } catch (error) {
-    console.error("❌ Error in getMyProfile:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message,
     });
