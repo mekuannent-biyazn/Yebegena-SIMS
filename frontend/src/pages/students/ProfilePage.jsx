@@ -57,6 +57,7 @@ export default function ProfilePage() {
     try {
       const { data } = await studentService.getProfile();
       // The response structure: { success: true, data: { ...profile } }
+      console.log("Profile data:", data.data); // Debug log
       setProfile(data.data);
     } catch (error) {
       console.error("Load profile error:", error);
@@ -392,57 +393,130 @@ export default function ProfilePage() {
               Enrollment Details
             </h3>
             <div className="grid grid-cols-2 gap-4">
-              <InfoItem icon={Shield} label="Registration Status">
-                <Badge status={profile.registrationStatus} />
-              </InfoItem>
-              <InfoItem icon={User} label="Student Level">
-                <Badge status={profile.studentStatus} />
-              </InfoItem>
-              <InfoItem icon={BookOpen} label="Assigned Class">
+              {/* Registration Status */}
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5">
+                <div className="flex items-center gap-2 mb-2">
+                  <Shield className="w-3.5 h-3.5 text-slate-400" />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Registration Status
+                  </p>
+                </div>
+                <span
+                  className={`text-sm font-semibold px-2 py-1 rounded-full ${
+                    profile.registrationStatus === "APPROVED"
+                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                      : profile.registrationStatus === "PENDING"
+                        ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
+                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                  }`}
+                >
+                  {profile.registrationStatus || "N/A"}
+                </span>
+              </div>
+
+              {/* Student Level */}
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5">
+                <div className="flex items-center gap-2 mb-2">
+                  <User className="w-3.5 h-3.5 text-slate-400" />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Student Level
+                  </p>
+                </div>
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  {profile.studentStatus || "N/A"}
+                </span>
+              </div>
+
+              {/* Assigned Class */}
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5">
+                <div className="flex items-center gap-2 mb-2">
+                  <BookOpen className="w-3.5 h-3.5 text-slate-400" />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Assigned Class
+                  </p>
+                </div>
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                   {profile.assignedClass?.className || "Not assigned yet"}
                 </span>
-              </InfoItem>
-              <InfoItem icon={Calendar} label="Enrolled On">
+                {profile.assignedClass?.classType && (
+                  <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
+                    ({profile.assignedClass.classType})
+                  </span>
+                )}
+              </div>
+
+              {/* Enrolled On */}
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Enrolled On
+                  </p>
+                </div>
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  {formatDate(profile.createdAt)}
+                  {formatDate(profile.createdAt) || "N/A"}
                 </span>
-              </InfoItem>
+              </div>
             </div>
           </div>
 
-          {/* Teacher Info - NEW */}
+          {/* Teacher Information - NEW */}
           {profile.assignedClass?.teacher && (
             <div className="card">
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-4">
                 Teacher Information
               </h3>
               <div className="grid grid-cols-2 gap-4">
-                <InfoItem icon={User} label="Teacher Name">
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <User className="w-3.5 h-3.5 text-slate-400" />
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Teacher Name
+                    </p>
+                  </div>
                   <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                     {profile.assignedClass.teacher.userId?.fullName ||
                       "Not assigned"}
                   </span>
-                </InfoItem>
-                <InfoItem icon={Phone} label="Teacher Phone">
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Phone className="w-3.5 h-3.5 text-slate-400" />
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Teacher Phone
+                    </p>
+                  </div>
                   <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                     {profile.assignedClass.teacher.userId?.phoneNumber || "N/A"}
                   </span>
-                </InfoItem>
-                <InfoItem icon={BookOpen} label="Class Type">
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <BookOpen className="w-3.5 h-3.5 text-slate-400" />
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Class Type
+                    </p>
+                  </div>
                   <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                     {profile.assignedClass.classType || "N/A"}
                   </span>
-                </InfoItem>
-                <InfoItem icon={Shield} label="Teacher Type">
+                </div>
+                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Shield className="w-3.5 h-3.5 text-slate-400" />
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Teacher Type
+                    </p>
+                  </div>
                   <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                     {profile.assignedClass.teacher.teacherType || "N/A"}
                   </span>
-                </InfoItem>
+                </div>
               </div>
             </div>
           )}
 
+          {/* Kflat Information */}
           {(profile.kflat || profile.kflatRole) && (
             <div className="card">
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-4">
@@ -450,19 +524,31 @@ export default function ProfilePage() {
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 {profile.kflat && (
-                  <InfoItem label="Kflat Group">
+                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <User className="w-3.5 h-3.5 text-slate-400" />
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Kflat Group
+                      </p>
+                    </div>
                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                       {profile.kflat.name}
                     </span>
-                  </InfoItem>
+                  </div>
                 )}
                 {(profile.kflatRole || profile.customKflatRole) && (
-                  <InfoItem label="Kflat Role">
+                  <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Shield className="w-3.5 h-3.5 text-slate-400" />
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Kflat Role
+                      </p>
+                    </div>
                     <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                       {profile.kflatRole?.roleName?.en ||
                         profile.customKflatRole}
                     </span>
-                  </InfoItem>
+                  </div>
                 )}
               </div>
             </div>
@@ -514,19 +600,6 @@ export default function ProfilePage() {
           </div>
         </div>
       </Modal>
-    </div>
-  );
-}
-
-// Info Item Component
-function InfoItem({ icon: Icon, label, children }) {
-  return (
-    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3.5">
-      <div className="flex items-center gap-2 mb-2">
-        {Icon && <Icon className="w-3.5 h-3.5 text-slate-400" />}
-        <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
-      </div>
-      {children}
     </div>
   );
 }
