@@ -58,32 +58,29 @@ export default function MySchedulePage() {
           const response = await studentService.getStudentByUserId(userId);
           console.log("Schedule - Student by user ID:", response);
           const data = response.data?.data || response.data;
-          // Check if data has studentData property (nested)
           student = data?.studentData || data;
         } catch (err) {
           console.log("Method 1 failed, trying method 2...");
         }
 
-        if (!student || student._id === userId) {
+        if (!student || !student.studentStatus) {
           try {
             // Method 2: Get my student profile
             const response = await studentService.getMyStudentProfile();
             console.log("Schedule - My student profile:", response);
             const data = response.data?.data || response.data;
-            // Check if data has studentData property (nested)
             student = data?.studentData || data;
           } catch (err) {
             console.log("Method 2 failed, trying method 3...");
           }
         }
 
-        if (!student || student._id === userId) {
+        if (!student || !student.studentStatus) {
           try {
-            // Method 3: Fallback to profile
+            // Method 3: Fallback to profile (WORKING)
             const response = await studentService.getProfile();
             console.log("Schedule - Profile (fallback):", response);
             const data = response.data?.data || response.data;
-            // Check if data has studentData property (nested)
             student = data?.studentData || data;
           } catch (err) {
             console.log("Method 3 failed...");
