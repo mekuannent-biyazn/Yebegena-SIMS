@@ -9,6 +9,8 @@ import {
   X,
   Save,
   Trash2,
+  CheckCircle,
+  Clock,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { studentService } from "../../services/studentService";
@@ -56,6 +58,7 @@ export default function ProfilePage() {
 
     try {
       const { data } = await studentService.getProfile();
+      console.log("📊 Profile Data:", data);
       setProfile(data.data);
     } catch (error) {
       console.error("Load profile error:", error);
@@ -69,14 +72,12 @@ export default function ProfilePage() {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("File size must be less than 5MB");
       e.target.value = "";
       return;
     }
 
-    // Validate file type
     const allowedTypes = [
       "image/jpeg",
       "image/jpg",
@@ -130,7 +131,6 @@ export default function ProfilePage() {
       return;
     }
 
-    // Check if any changes were made
     const nameChanged = fullName.trim() !== user.fullName;
     const phoneChanged = phoneNumber.trim() !== user.phoneNumber;
     const pictureChanged = !!pictureFile;
@@ -151,7 +151,6 @@ export default function ProfilePage() {
 
       const { data } = await studentService.updateProfile(formData);
 
-      // Update user in store
       setUser(data.user);
 
       toast.success("Profile updated successfully!");
@@ -160,7 +159,6 @@ export default function ProfilePage() {
       setPreviewUrl(data.user.picture || "");
       setErrors({});
 
-      // Reload profile if student
       if (isStudent) {
         await loadProfile();
       }
@@ -187,17 +185,11 @@ export default function ProfilePage() {
     }
   };
 
-  // FIXED: Delete Profile Picture Function
   const handleDeletePicture = async () => {
     setDeletingPicture(true);
     try {
-      console.log("Deleting profile picture...");
-
       const response = await studentService.deleteProfilePicture();
 
-      console.log("Delete response:", response.data);
-
-      // Update user in store - clear picture
       const updatedUser = {
         ...user,
         picture: null,
@@ -210,7 +202,6 @@ export default function ProfilePage() {
       toast.success("Profile picture removed successfully");
       setShowDeleteModal(false);
 
-      // Reload profile if student
       if (isStudent) {
         await loadProfile();
       }
@@ -222,6 +213,30 @@ export default function ProfilePage() {
     } finally {
       setDeletingPicture(false);
     }
+  };
+
+  // Get status badge color for registration
+  const getRegistrationStatusBadge = (status) => {
+    const statusMap = {
+      APPROVED: {
+        color:
+          "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+        label: "Approved",
+        icon: CheckCircle,
+      },
+      PENDING: {
+        color:
+          "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+        label: "Pending",
+        icon: Clock,
+      },
+      REJECTED: {
+        color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+        label: "Rejected",
+        icon: X,
+      },
+    };
+    return statusMap[status] || statusMap.PENDING;
   };
 
   if (loading) return <SkeletonCard />;
@@ -384,7 +399,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Student-specific info */}
+      {/* Student-specific info - FIXED */}
       {isStudent && profile && (
         <>
           <div className="card">
@@ -393,19 +408,36 @@ export default function ProfilePage() {
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <InfoItem icon={Shield} label="Registration Status">
-                <Badge status={profile.registrationStatus} />
+                <Badge
+                  status={profile.registrationStatus || "PENDING"}
+                  className={
+                    profile.registrationStatus === "APPROVED"
+                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                      : profile.registrationStatus === "REJECTED"
+                        ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                        : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
+                  }
+                />
               </InfoItem>
               <InfoItem icon={User} label="Student Level">
-                <Badge status={profile.studentStatus} />
+                <Badge
+                  status={profile.role || user?.role}
+                  className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
+                />
               </InfoItem>
               <InfoItem icon={BookOpen} label="Assigned Class">
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                   {profile.assignedClass?.className || "Not assigned yet"}
                 </span>
+                {profile.assignedClass?.classType && (
+                  <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">
+                    {profile.assignedClass.classType}
+                  </span>
+                )}
               </InfoItem>
               <InfoItem icon={Calendar} label="Enrolled On">
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  {formatDate(profile.createdAt)}
+                  {formatDate(profile.createdAt || profile.createdAt)}
                 </span>
               </InfoItem>
             </div>
@@ -438,7 +470,7 @@ export default function ProfilePage() {
         </>
       )}
 
-      {/* Delete Picture Confirmation Modal - FIXED */}
+      {/* Delete Picture Confirmation Modal */}
       <Modal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
