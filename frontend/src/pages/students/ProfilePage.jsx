@@ -57,9 +57,14 @@ export default function ProfilePage() {
     }
 
     try {
-      const { data } = await studentService.getProfile();
-      console.log("📊 Profile Data:", data);
-      setProfile(data.data);
+      const response = await studentService.getProfile();
+      console.log("📊 Full Profile Response:", response);
+
+      // Handle different response structures
+      let studentData = response.data?.data || response.data;
+      console.log("📊 Student Data:", studentData);
+
+      setProfile(studentData);
     } catch (error) {
       console.error("Load profile error:", error);
       toast.error("Failed to load profile");
@@ -213,30 +218,6 @@ export default function ProfilePage() {
     } finally {
       setDeletingPicture(false);
     }
-  };
-
-  // Get status badge color for registration
-  const getRegistrationStatusBadge = (status) => {
-    const statusMap = {
-      APPROVED: {
-        color:
-          "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-        label: "Approved",
-        icon: CheckCircle,
-      },
-      PENDING: {
-        color:
-          "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-        label: "Pending",
-        icon: Clock,
-      },
-      REJECTED: {
-        color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-        label: "Rejected",
-        icon: X,
-      },
-    };
-    return statusMap[status] || statusMap.PENDING;
   };
 
   if (loading) return <SkeletonCard />;
@@ -421,17 +402,25 @@ export default function ProfilePage() {
               </InfoItem>
               <InfoItem icon={User} label="Student Level">
                 <Badge
-                  status={profile.role || user?.role}
+                  status={profile.studentStatus || profile.role || user?.role}
                   className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
                 />
               </InfoItem>
               <InfoItem icon={BookOpen} label="Assigned Class">
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  {profile.assignedClass?.className || "Not assigned yet"}
-                </span>
-                {profile.assignedClass?.classType && (
-                  <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">
-                    {profile.assignedClass.classType}
+                {profile.assignedClass ? (
+                  <div>
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      {profile.assignedClass.className || "Not assigned yet"}
+                    </span>
+                    {profile.assignedClass.classType && (
+                      <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">
+                        {profile.assignedClass.classType}
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    Not assigned yet
                   </span>
                 )}
               </InfoItem>
