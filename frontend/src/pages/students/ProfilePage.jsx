@@ -9,8 +9,6 @@ import {
   X,
   Save,
   Trash2,
-  CheckCircle,
-  Clock,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { studentService } from "../../services/studentService";
@@ -57,15 +55,9 @@ export default function ProfilePage() {
     }
 
     try {
-      const response = await studentService.getProfile();
-      console.log("📊 Full Profile Response:", response);
-
-      // IMPORTANT: Extract data correctly - response.data.data
-      const studentData = response.data?.data || response.data;
-      console.log("📊 Student Data:", studentData);
-      console.log("📊 Assigned Class:", studentData?.assignedClass);
-
-      setProfile(studentData);
+      const { data } = await studentService.getProfile();
+      // The response structure: { success: true, data: { ...profile } }
+      setProfile(data.data);
     } catch (error) {
       console.error("Load profile error:", error);
       toast.error("Failed to load profile");
@@ -78,12 +70,14 @@ export default function ProfilePage() {
     const file = e.target.files[0];
     if (!file) return;
 
+    // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("File size must be less than 5MB");
       e.target.value = "";
       return;
     }
 
+    // Validate file type
     const allowedTypes = [
       "image/jpeg",
       "image/jpg",
@@ -99,6 +93,14 @@ export default function ProfilePage() {
 
     setPictureFile(file);
     setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleRemovePicture = () => {
+    setPictureFile(null);
+    setPreviewUrl(user?.picture || "");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const validateForm = () => {
@@ -129,6 +131,7 @@ export default function ProfilePage() {
       return;
     }
 
+    // Check if any changes were made
     const nameChanged = fullName.trim() !== user.fullName;
     const phoneChanged = phoneNumber.trim() !== user.phoneNumber;
     const pictureChanged = !!pictureFile;
@@ -149,6 +152,7 @@ export default function ProfilePage() {
 
       const { data } = await studentService.updateProfile(formData);
 
+      // Update user in store
       setUser(data.user);
 
       toast.success("Profile updated successfully!");
@@ -157,6 +161,7 @@ export default function ProfilePage() {
       setPreviewUrl(data.user.picture || "");
       setErrors({});
 
+      // Reload profile if student
       if (isStudent) {
         await loadProfile();
       }
@@ -186,8 +191,13 @@ export default function ProfilePage() {
   const handleDeletePicture = async () => {
     setDeletingPicture(true);
     try {
+      console.log("Deleting profile picture...");
+
       const response = await studentService.deleteProfilePicture();
 
+      console.log("Delete response:", response.data);
+
+      // Update user in store - clear picture
       const updatedUser = {
         ...user,
         picture: null,
@@ -200,6 +210,7 @@ export default function ProfilePage() {
       toast.success("Profile picture removed successfully");
       setShowDeleteModal(false);
 
+      // Reload profile if student
       if (isStudent) {
         await loadProfile();
       }
@@ -373,7 +384,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Student-specific info - FIXED */}
+      {/* Student-specific info */}
       {isStudent && profile && (
         <>
           <div className="card">
@@ -382,53 +393,55 @@ export default function ProfilePage() {
             </h3>
             <div className="grid grid-cols-2 gap-4">
               <InfoItem icon={Shield} label="Registration Status">
-                <Badge
-                  status={profile.registrationStatus || "PENDING"}
-                  className={
-                    profile.registrationStatus === "APPROVED"
-                      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                      : profile.registrationStatus === "REJECTED"
-                        ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                        : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                  }
-                />
+                <Badge status={profile.registrationStatus} />
               </InfoItem>
               <InfoItem icon={User} label="Student Level">
-                <Badge
-                  status={profile.studentStatus || profile.role || user?.role}
-                  className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"
-                />
+                <Badge status={profile.studentStatus} />
               </InfoItem>
               <InfoItem icon={BookOpen} label="Assigned Class">
-                {profile.assignedClass ? (
-                  <div>
-                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                      {profile.assignedClass.className || "Not assigned yet"}
-                    </span>
-                    {profile.assignedClass.classType && (
-                      <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">
-                        {profile.assignedClass.classType}
-                      </span>
-                    )}
-                    {profile.assignedClass.teacher?.userId?.fullName && (
-                      <span className="text-xs text-slate-400 dark:text-slate-500 block mt-0.5">
-                        Teacher: {profile.assignedClass.teacher.userId.fullName}
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                    Not assigned yet
-                  </span>
-                )}
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  {profile.assignedClass?.className || "Not assigned yet"}
+                </span>
               </InfoItem>
               <InfoItem icon={Calendar} label="Enrolled On">
                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  {formatDate(profile.createdAt || profile.createdAt)}
+                  {formatDate(profile.createdAt)}
                 </span>
               </InfoItem>
             </div>
           </div>
+
+          {/* Teacher Info - NEW */}
+          {profile.assignedClass?.teacher && (
+            <div className="card">
+              <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-4">
+                Teacher Information
+              </h3>
+              <div className="grid grid-cols-2 gap-4">
+                <InfoItem icon={User} label="Teacher Name">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    {profile.assignedClass.teacher.userId?.fullName ||
+                      "Not assigned"}
+                  </span>
+                </InfoItem>
+                <InfoItem icon={Phone} label="Teacher Phone">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    {profile.assignedClass.teacher.userId?.phoneNumber || "N/A"}
+                  </span>
+                </InfoItem>
+                <InfoItem icon={BookOpen} label="Class Type">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    {profile.assignedClass.classType || "N/A"}
+                  </span>
+                </InfoItem>
+                <InfoItem icon={Shield} label="Teacher Type">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    {profile.assignedClass.teacher.teacherType || "N/A"}
+                  </span>
+                </InfoItem>
+              </div>
+            </div>
+          )}
 
           {(profile.kflat || profile.kflatRole) && (
             <div className="card">
