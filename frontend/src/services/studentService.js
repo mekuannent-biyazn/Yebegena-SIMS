@@ -14,13 +14,7 @@ export const studentService = {
   getAll: () => api.get("/students/students"),
   getById: (id) => api.get(`/students/${id}`),
 
-  // Get student by user ID
-  getStudentByUserId: (userId) => api.get(`/students/user/${userId}`),
-
-  // Get current student profile
-  getMyStudentProfile: () => api.get("/students/me"),
-
-  // Keep this for backward compatibility but it returns USER data
+  // Use only the working endpoint
   getProfile: () => api.get("/profile"),
 
   updateProfile: (formData) =>

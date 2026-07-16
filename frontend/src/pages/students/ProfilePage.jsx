@@ -55,60 +55,12 @@ export default function ProfilePage() {
     }
 
     try {
-      let studentData = null;
+      const response = await studentService.getProfile();
+      const data = response.data?.data || response.data;
+      const studentData = data?.studentData || data;
 
-      // Try multiple methods to get student data
-      // Method 1: Try to get student by user ID
-      if (user?._id) {
-        try {
-          const response = await studentService.getStudentByUserId(user._id);
-          console.log("Student by user ID response:", response);
-          const data = response.data?.data || response.data;
-          studentData = data?.studentData || data;
-        } catch (err) {
-          console.log(
-            "Could not fetch student by user ID, trying other methods...",
-          );
-        }
-      }
-
-      // Method 2: Try getMyStudentProfile
-      if (!studentData || !studentData.studentStatus) {
-        try {
-          const response = await studentService.getMyStudentProfile();
-          console.log("My student profile response:", response);
-          const data = response.data?.data || response.data;
-          studentData = data?.studentData || data;
-        } catch (err) {
-          console.log(
-            "Could not fetch my student profile, trying profile endpoint...",
-          );
-        }
-      }
-
-      // Method 3: Fallback to profile endpoint (WORKING)
-      if (!studentData || !studentData.studentStatus) {
-        try {
-          const response = await studentService.getProfile();
-          console.log("Profile response (fallback):", response);
-          const data = response.data?.data || response.data;
-          studentData = data?.studentData || data;
-        } catch (err) {
-          console.log("All methods failed...");
-        }
-      }
-
-      // If studentData has _id matching user ID, check for studentData property
-      if (studentData && studentData._id === user?._id) {
-        if (studentData.studentData) {
-          studentData = studentData.studentData;
-        }
-      }
-
-      console.log("Final student data:", studentData);
       setProfile(studentData);
     } catch (error) {
-      console.error("Load profile error:", error);
       toast.error("Failed to load profile");
     } finally {
       setLoading(false);
@@ -119,14 +71,12 @@ export default function ProfilePage() {
     const file = e.target.files[0];
     if (!file) return;
 
-    // Validate file size (5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("File size must be less than 5MB");
       e.target.value = "";
       return;
     }
 
-    // Validate file type
     const allowedTypes = [
       "image/jpeg",
       "image/jpg",
@@ -180,7 +130,6 @@ export default function ProfilePage() {
       return;
     }
 
-    // Check if any changes were made
     const nameChanged = fullName.trim() !== user.fullName;
     const phoneChanged = phoneNumber.trim() !== user.phoneNumber;
     const pictureChanged = !!pictureFile;
@@ -201,7 +150,6 @@ export default function ProfilePage() {
 
       const { data } = await studentService.updateProfile(formData);
 
-      // Update user in store
       setUser(data.user);
 
       toast.success("Profile updated successfully!");
@@ -210,12 +158,10 @@ export default function ProfilePage() {
       setPreviewUrl(data.user.picture || "");
       setErrors({});
 
-      // Reload profile if student
       if (isStudent) {
         await loadProfile();
       }
     } catch (error) {
-      console.error("Update profile error:", error);
       const errorData = error.response?.data;
       if (errorData?.errors) {
         const errorObj = {};
@@ -240,13 +186,8 @@ export default function ProfilePage() {
   const handleDeletePicture = async () => {
     setDeletingPicture(true);
     try {
-      console.log("Deleting profile picture...");
+      await studentService.deleteProfilePicture();
 
-      const response = await studentService.deleteProfilePicture();
-
-      console.log("Delete response:", response.data);
-
-      // Update user in store - clear picture
       const updatedUser = {
         ...user,
         picture: null,
@@ -259,12 +200,10 @@ export default function ProfilePage() {
       toast.success("Profile picture removed successfully");
       setShowDeleteModal(false);
 
-      // Reload profile if student
       if (isStudent) {
         await loadProfile();
       }
     } catch (error) {
-      console.error("Delete picture error:", error);
       toast.error(
         error.response?.data?.message || "Failed to remove profile picture",
       );
@@ -275,7 +214,6 @@ export default function ProfilePage() {
 
   if (loading) return <SkeletonCard />;
 
-  // Check if we have student data (has studentStatus field)
   const hasStudentData =
     profile && (profile.studentStatus || profile.assignedClass);
 
@@ -525,7 +463,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Kflat Information - Only show if data exists */}
+      {/* Kflat Information */}
       {isStudent && profile && (profile.kflat || profile.kflatRole) && (
         <div className="card">
           <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-4">

@@ -48,84 +48,30 @@ export default function MySchedulePage() {
     async function loadData() {
       setLoading(true);
       try {
-        let student = null;
-        const userId =
-          localStorage.getItem("userId") || sessionStorage.getItem("userId");
-
-        // Try multiple methods to get student data
-        // Method 1: Get student by user ID
-        try {
-          const response = await studentService.getStudentByUserId(userId);
-          console.log("Schedule - Student by user ID:", response);
-          const data = response.data?.data || response.data;
-          student = data?.studentData || data;
-        } catch (err) {
-          console.log("Method 1 failed, trying method 2...");
-        }
+        // Get student data from profile endpoint
+        const response = await studentService.getProfile();
+        const data = response.data?.data || response.data;
+        const student = data?.studentData || data;
 
         if (!student || !student.studentStatus) {
-          try {
-            // Method 2: Get my student profile
-            const response = await studentService.getMyStudentProfile();
-            console.log("Schedule - My student profile:", response);
-            const data = response.data?.data || response.data;
-            student = data?.studentData || data;
-          } catch (err) {
-            console.log("Method 2 failed, trying method 3...");
-          }
-        }
-
-        if (!student || !student.studentStatus) {
-          try {
-            // Method 3: Fallback to profile (WORKING)
-            const response = await studentService.getProfile();
-            console.log("Schedule - Profile (fallback):", response);
-            const data = response.data?.data || response.data;
-            student = data?.studentData || data;
-          } catch (err) {
-            console.log("Method 3 failed...");
-          }
-        }
-
-        // If student data is still user data, check if it has studentData property
-        if (student && student._id === userId && student.studentData) {
-          student = student.studentData;
-        }
-
-        console.log("Schedule - Final student data:", student);
-
-        if (!student || !student.studentStatus) {
-          console.error("No student data found");
           setLoading(false);
           return;
         }
 
-        // Extract class ID from the student data
         const classId = student?.assignedClass?._id || student?.assignedClass;
 
         if (!classId) {
-          console.warn("No class assigned to this student");
           setLoading(false);
           return;
         }
 
-        // Store class info for display
         setClassInfo(student.assignedClass);
 
-        // Fetch schedules using the class ID
         const schedulesResponse = await scheduleService.getByClass(classId);
-        console.log("Schedule - Schedules response:", schedulesResponse);
-
-        // Extract schedules from response: { success: true, count: 2, data: [...] }
         const schedulesData =
           schedulesResponse?.data?.data || schedulesResponse?.data || [];
         setSchedules(schedulesData);
-
-        if (schedulesData.length === 0) {
-          toast.info("No schedules found for your class");
-        }
       } catch (error) {
-        console.error("Error loading data:", error);
         toast.error(t("loadingFailed") || "Failed to load schedule");
       } finally {
         setLoading(false);
@@ -135,7 +81,6 @@ export default function MySchedulePage() {
     loadData();
   }, [t]);
 
-  // Group schedules by day of week
   const grouped = DAYS_OF_WEEK.reduce((acc, day) => {
     acc[day] = schedules.filter((s) => s.dayOfWeek === day);
     return acc;
@@ -169,7 +114,6 @@ export default function MySchedulePage() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">
@@ -179,18 +123,12 @@ export default function MySchedulePage() {
             {classInfo?.className && `Class: ${classInfo.className}`}
             {classInfo?.classType && ` (${classInfo.classType})`}
           </p>
-          {classInfo?.teacher?.userId?.fullName && (
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-              Teacher: {classInfo.teacher.userId.fullName}
-            </p>
-          )}
         </div>
         <div className="badge bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
           {schedules.length} sessions/week
         </div>
       </div>
 
-      {/* Weekly summary */}
       {schedules.length > 0 && (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-2">
           {DAYS_OF_WEEK.map((day) => (
