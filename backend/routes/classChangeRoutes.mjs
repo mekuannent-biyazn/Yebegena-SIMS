@@ -9,11 +9,12 @@ import {
   rejectClassChange,
   cancelClassChangeRequest,
   acceptVolunteerMatch,
+  getAllRequests,
 } from "../controllers/classChangeController.mjs";
 
 const router = express.Router();
 
-// Student routes - allow both FRESH_STUDENT and ADVANCED_STUDENT
+// Student routes
 router.post(
   "/request",
   protect,
@@ -50,8 +51,15 @@ router.post(
 );
 
 // Admin routes
-router.put("/approve/:id", protect, authorize("ADMIN"), approveClassChange);
+router.get("/admin/all", protect, authorize("ADMIN"), getAllRequests);
 
-router.put("/reject/:id", protect, authorize("ADMIN"), rejectClassChange);
+router.put(
+  "/admin/approve/:id",
+  protect,
+  authorize("ADMIN"),
+  approveClassChange,
+);
+
+router.put("/admin/reject/:id", protect, authorize("ADMIN"), rejectClassChange);
 
 export default router;

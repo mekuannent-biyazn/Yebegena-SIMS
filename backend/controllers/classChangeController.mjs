@@ -305,52 +305,19 @@ export const acceptVolunteerMatch = async (req, res) => {
       });
     }
 
-    // Store old class names for notification
-    const oldClassA = volunteerRequest.currentClass?.className || "N/A";
-    const oldClassB = currentStudent.assignedClass?.className || "N/A";
-
-    // --- IMMEDIATE CLASS SWAP STARTS HERE ---
-
-    // Get the volunteer student
-    const volunteerStudent = await Student.findById(
-      volunteerRequest.requesterStudent._id,
-    ).populate("assignedClass");
-
-    if (!volunteerStudent) {
-      return res.status(404).json({
-        success: false,
-        message: "Volunteer student not found",
-      });
-    }
-
-    // Swap classes between the two students IMMEDIATELY
-    const tempClass = currentStudent.assignedClass;
-    currentStudent.assignedClass = volunteerStudent.assignedClass;
-    volunteerStudent.assignedClass = tempClass;
-
-    // Save both students with their new classes
-    await currentStudent.save();
-    await volunteerStudent.save();
-
-    // --- CLASS SWAP COMPLETE ---
-
-    // Create a new request for the current student (already APPROVED)
+    // Create a new request for the current student
     currentStudentRequest = await ClassChangeRequest.create({
       requesterStudent: currentStudent._id,
       currentClass: volunteerRequest.currentClass._id,
       desiredClass: volunteerRequest.desiredClass._id,
-      reason: "Volunteer match acceptance - Auto approved",
-      status: "APPROVED", // Immediately approved
-      approvedBy: req.user._id,
-      approvedAt: new Date(),
+      reason: `Accepted match with ${volunteerRequest.requesterStudent.userId.fullName}`,
+      status: "MATCHED", // Set to MATCHED, waiting for admin approval
       matchedStudent: volunteerRequest.requesterStudent._id,
     });
 
-    // Update the volunteer's request to APPROVED
-    volunteerRequest.status = "APPROVED";
+    // Update the volunteer's request to MATCHED
+    volunteerRequest.status = "MATCHED";
     volunteerRequest.matchedStudent = currentStudent._id;
-    volunteerRequest.approvedBy = req.user._id;
-    volunteerRequest.approvedAt = new Date();
     await volunteerRequest.save();
 
     // Send notifications to both students
@@ -358,50 +325,44 @@ export const acceptVolunteerMatch = async (req, res) => {
       await createNotification({
         recipient: volunteerRequest.requesterStudent.userId,
         recipientType: "STUDENT",
-        title: "🎉 Class Change Approved!",
-        message: `Your class change request has been approved! You have been moved from ${oldClassA} to ${currentStudent.assignedClass?.className || "new class"}`,
-        type: "SUCCESS",
+        title: "🔔 Match Found!",
+        message: `Your class change request has been matched with ${currentStudent.userId.fullName}! Please wait for admin approval.`,
+        type: "INFO",
         createdBy: req.user._id,
       });
 
       await createNotification({
         recipient: currentStudent.userId,
         recipientType: "STUDENT",
-        title: "🎉 Class Change Approved!",
-        message: `Your class change request has been approved! You have been moved from ${oldClassB} to ${volunteerStudent.assignedClass?.className || "new class"}`,
-        type: "SUCCESS",
-        createdBy: req.user._id,
-      });
-
-      // Notify admin about the automatic approval
-      await createNotification({
-        recipient: req.user._id,
-        recipientType: "ADMIN",
-        title: "Auto Class Change Completed",
-        message: `${currentStudent.userId?.fullName} and ${volunteerRequest.requesterStudent.userId?.fullName} have successfully swapped classes automatically.`,
+        title: "🔔 Match Found!",
+        message: `You have been matched with ${volunteerRequest.requesterStudent.userId.fullName}! Please wait for admin approval.`,
         type: "INFO",
         createdBy: req.user._id,
       });
+
+      // Notify admin about the match
+      const adminUsers = await User.find({ role: "ADMIN" });
+      for (const admin of adminUsers) {
+        await createNotification({
+          recipient: admin._id,
+          recipientType: "ADMIN",
+          title: "🔔 New Class Change Match",
+          message: `${currentStudent.userId.fullName} and ${volunteerRequest.requesterStudent.userId.fullName} have matched. Please review and approve the class change.`,
+          type: "INFO",
+          createdBy: req.user._id,
+        });
+      }
     } catch (notifError) {
       console.error("Failed to create notifications:", notifError);
     }
 
     return res.status(200).json({
       success: true,
-      message: "Class swap completed successfully!",
+      message: "Match accepted! Waiting for admin approval.",
       data: {
         currentStudentRequest,
         volunteerRequest,
-        currentStudent: {
-          _id: currentStudent._id,
-          fullName: currentStudent.userId?.fullName,
-          newClass: currentStudent.assignedClass,
-        },
-        volunteerStudent: {
-          _id: volunteerStudent._id,
-          fullName: volunteerStudent.userId?.fullName,
-          newClass: volunteerStudent.assignedClass,
-        },
+        matchStatus: "PENDING_ADMIN_APPROVAL",
       },
     });
   } catch (error) {
@@ -458,6 +419,25 @@ export const approveClassChange = async (req, res) => {
     await studentA.save();
     await studentB.save();
 
+    // Update both requests
+    request.status = "APPROVED";
+    request.approvedBy = req.user._id;
+    request.approvedAt = new Date();
+    await request.save();
+
+    // Find and update the matched student's request
+    const matchedRequest = await ClassChangeRequest.findOne({
+      requesterStudent: request.matchedStudent._id,
+      status: "MATCHED",
+    });
+
+    if (matchedRequest) {
+      matchedRequest.status = "APPROVED";
+      matchedRequest.approvedBy = req.user._id;
+      matchedRequest.approvedAt = new Date();
+      await matchedRequest.save();
+    }
+
     // Send notifications to both students
     try {
       await createNotification({
@@ -481,27 +461,21 @@ export const approveClassChange = async (req, res) => {
       console.error("Failed to create notification:", notifError);
     }
 
-    request.status = "APPROVED";
-    request.approvedBy = req.user._id;
-    request.approvedAt = new Date();
-    await request.save();
-
-    // Also update the matched request
-    const matchedRequest = await ClassChangeRequest.findOne({
-      requesterStudent: request.matchedStudent._id,
-      status: "MATCHED",
-    });
-
-    if (matchedRequest) {
-      matchedRequest.status = "APPROVED";
-      matchedRequest.approvedBy = req.user._id;
-      matchedRequest.approvedAt = new Date();
-      await matchedRequest.save();
-    }
-
     return res.status(200).json({
       success: true,
       message: "Class swap approved successfully",
+      data: {
+        studentA: {
+          _id: studentA._id,
+          fullName: studentA.userId?.fullName,
+          newClass: studentA.assignedClass,
+        },
+        studentB: {
+          _id: studentB._id,
+          fullName: studentB.userId?.fullName,
+          newClass: studentB.assignedClass,
+        },
+      },
     });
   } catch (error) {
     console.error("Approve class change error:", error);
@@ -582,7 +556,21 @@ export const cancelClassChangeRequest = async (req, res) => {
       });
     }
 
+    // If the request is MATCHED, also update the matched request
+    if (request.status === "MATCHED" && request.matchedStudent) {
+      const matchedRequest = await ClassChangeRequest.findOne({
+        requesterStudent: request.matchedStudent,
+        status: "MATCHED",
+      });
+      if (matchedRequest) {
+        matchedRequest.status = "OPEN";
+        matchedRequest.matchedStudent = null;
+        await matchedRequest.save();
+      }
+    }
+
     request.status = "CANCELLED";
+    request.matchedStudent = null;
     await request.save();
 
     return res.status(200).json({
@@ -591,6 +579,52 @@ export const cancelClassChangeRequest = async (req, res) => {
     });
   } catch (error) {
     console.error("Cancel class change error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// Get all requests for admin
+export const getAllRequests = async (req, res) => {
+  try {
+    const requests = await ClassChangeRequest.find()
+      .populate({
+        path: "requesterStudent",
+        populate: {
+          path: "userId",
+          select: "fullName phoneNumber email",
+        },
+      })
+      .populate("currentClass", "className classType")
+      .populate("desiredClass", "className classType")
+      .populate({
+        path: "matchedStudent",
+        populate: {
+          path: "userId",
+          select: "fullName phoneNumber email",
+        },
+      })
+      .sort({ createdAt: -1 });
+
+    // Calculate stats
+    const stats = {
+      total: requests.length,
+      open: requests.filter((r) => r.status === "OPEN").length,
+      matched: requests.filter((r) => r.status === "MATCHED").length,
+      approved: requests.filter((r) => r.status === "APPROVED").length,
+      rejected: requests.filter((r) => r.status === "REJECTED").length,
+      cancelled: requests.filter((r) => r.status === "CANCELLED").length,
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: requests,
+      stats,
+    });
+  } catch (error) {
+    console.error("Get all requests error:", error);
     return res.status(500).json({
       success: false,
       message: error.message,
