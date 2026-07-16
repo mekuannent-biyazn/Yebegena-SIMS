@@ -3,6 +3,7 @@ import { Calendar, BookOpen, Clock, MapPin, AlertCircle } from "lucide-react";
 import toast from "react-hot-toast";
 import { scheduleService } from "../../services/scheduleService";
 import { studentService } from "../../services/studentService";
+import { useAuthStore } from "../../store/authStore";
 import { useI18nStore } from "../../store/i18nStore";
 import { SkeletonCard } from "../../components/ui/Skeleton";
 import EmptyState from "../../components/ui/EmptyState";
@@ -51,6 +52,7 @@ const ORDERED_DAYS = [
 
 export default function MySchedulePage() {
   const { t } = useI18nStore();
+  const { user } = useAuthStore();
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [classInfo, setClassInfo] = useState(null);
@@ -65,15 +67,17 @@ export default function MySchedulePage() {
         const response = await studentService.getProfile();
         console.log("📊 Student Profile Response:", response);
 
-        // Extract student data
-        let student = response.data?.data || response.data;
+        // IMPORTANT: Extract data correctly - response.data.data
+        const student = response.data?.data || response.data;
         console.log("📊 Student Data:", student);
+        console.log("📊 Assigned Class:", student?.assignedClass);
 
         // Get assigned class
         let classId = null;
         let classObj = null;
 
-        if (student.assignedClass) {
+        if (student?.assignedClass) {
+          // Check if it's a populated object or just an ID
           if (
             typeof student.assignedClass === "object" &&
             student.assignedClass._id
@@ -103,11 +107,20 @@ export default function MySchedulePage() {
         const scheduleResponse = await scheduleService.getByClass(classId);
         console.log("📊 Schedule Response:", scheduleResponse);
 
-        // Extract schedules
-        let schedulesData =
-          scheduleResponse.data?.data || scheduleResponse.data || [];
-        if (!Array.isArray(schedulesData)) {
-          schedulesData = [];
+        // Extract schedules - the API returns { success, count, data: [...] }
+        let schedulesData = [];
+        if (
+          scheduleResponse?.data?.data &&
+          Array.isArray(scheduleResponse.data.data)
+        ) {
+          schedulesData = scheduleResponse.data.data;
+        } else if (
+          scheduleResponse?.data &&
+          Array.isArray(scheduleResponse.data)
+        ) {
+          schedulesData = scheduleResponse.data;
+        } else if (Array.isArray(scheduleResponse)) {
+          schedulesData = scheduleResponse;
         }
 
         console.log("📊 Schedules Data:", schedulesData);

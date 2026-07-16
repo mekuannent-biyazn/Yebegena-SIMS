@@ -60,9 +60,10 @@ export default function ProfilePage() {
       const response = await studentService.getProfile();
       console.log("📊 Full Profile Response:", response);
 
-      // Handle different response structures
-      let studentData = response.data?.data || response.data;
+      // IMPORTANT: Extract data correctly - response.data.data
+      const studentData = response.data?.data || response.data;
       console.log("📊 Student Data:", studentData);
+      console.log("📊 Assigned Class:", studentData?.assignedClass);
 
       setProfile(studentData);
     } catch (error) {
@@ -98,14 +99,6 @@ export default function ProfilePage() {
 
     setPictureFile(file);
     setPreviewUrl(URL.createObjectURL(file));
-  };
-
-  const handleRemovePicture = () => {
-    setPictureFile(null);
-    setPreviewUrl(user?.picture || "");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
   };
 
   const validateForm = () => {
@@ -415,6 +408,11 @@ export default function ProfilePage() {
                     {profile.assignedClass.classType && (
                       <span className="text-xs text-slate-500 dark:text-slate-400 block mt-0.5">
                         {profile.assignedClass.classType}
+                      </span>
+                    )}
+                    {profile.assignedClass.teacher?.userId?.fullName && (
+                      <span className="text-xs text-slate-400 dark:text-slate-500 block mt-0.5">
+                        Teacher: {profile.assignedClass.teacher.userId.fullName}
                       </span>
                     )}
                   </div>
