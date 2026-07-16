@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Calendar } from "lucide-react";
 import toast from "react-hot-toast";
 import { scheduleService } from "../../services/scheduleService";
-import { studentService } from "../../services/studentService";
 import { useI18nStore } from "../../store/i18nStore";
 import { SkeletonCard } from "../../components/ui/Skeleton";
 import EmptyState from "../../components/ui/EmptyState";
@@ -42,40 +41,45 @@ export default function MySchedulePage() {
   const { t } = useI18nStore();
   const [schedules, setSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [classInfo, setClassInfo] = useState(null);
+  const [classId, setClassId] = useState(null);
 
   useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      try {
-        // Get student profile
-        const { data: profileData } = await studentService.getProfile();
-        const student = profileData.data || profileData;
-        const classId = student?.assignedClass?._id || student?.assignedClass;
+    // Get classId from localStorage or URL params
+    // You can also get it from your auth store if available
+    const storedClassId =
+      localStorage.getItem("studentClassId") ||
+      sessionStorage.getItem("studentClassId");
 
-        if (!classId) {
-          setLoading(false);
-          return;
-        }
-
-        setClassInfo(student?.assignedClass);
-
-        // Get schedules for the class
-        const response = await scheduleService.getByClass(classId);
-
-        // The response structure: { success: true, count: 2, data: [...] }
-        // So we need to access response.data.data
-        const schedulesData = response?.data?.data || response?.data || [];
-        setSchedules(schedulesData);
-      } catch (error) {
-        console.error("Error loading schedule:", error);
-        toast.error(t("loadingFailed") || "Failed to load schedule");
-      } finally {
-        setLoading(false);
-      }
+    if (storedClassId) {
+      setClassId(storedClassId);
+      fetchSchedules(storedClassId);
+    } else {
+      // If no classId is stored, try to get it from the user profile
+      // but we'll use a direct approach with a default or prompt
+      setLoading(false);
     }
-    loadData();
-  }, [t]);
+  }, []);
+
+  const fetchSchedules = async (classId) => {
+    setLoading(true);
+    try {
+      // Direct API call to get schedules by class ID
+      const response = await scheduleService.getByClass(classId);
+
+      // The response structure: { success: true, count: 2, data: [...] }
+      const schedulesData = response?.data?.data || response?.data || [];
+      setSchedules(schedulesData);
+
+      if (schedulesData.length === 0) {
+        toast.info("No schedules found for this class");
+      }
+    } catch (error) {
+      console.error("Error loading schedules:", error);
+      toast.error(t("loadingFailed") || "Failed to load schedules");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Group schedules by day of week
   const grouped = DAYS_OF_WEEK.reduce((acc, day) => {
@@ -97,14 +101,38 @@ export default function MySchedulePage() {
     );
   }
 
-  if (!classInfo) {
+  if (!classId) {
     return (
       <div className="card">
         <EmptyState
           icon={Calendar}
           title="No class assigned"
-          description="You haven't been assigned to a class yet. Please contact your admin."
+          description="Please select a class to view schedules"
         />
+        <div className="mt-4 flex justify-center">
+          <input
+            type="text"
+            placeholder="Enter Class ID"
+            className="px-4 py-2 border rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            id="classIdInput"
+          />
+          <button
+            onClick={() => {
+              const input = document.getElementById("classIdInput");
+              const id = input?.value?.trim();
+              if (id) {
+                localStorage.setItem("studentClassId", id);
+                setClassId(id);
+                fetchSchedules(id);
+              } else {
+                toast.error("Please enter a valid class ID");
+              }
+            }}
+            className="px-4 py-2 bg-primary-600 text-white rounded-r-lg hover:bg-primary-700"
+          >
+            Load Schedule
+          </button>
+        </div>
       </div>
     );
   }
@@ -118,7 +146,7 @@ export default function MySchedulePage() {
             {t("mySchedule") || "My Schedule"}
           </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            {classInfo?.className && `Class: ${classInfo.className}`}
+            Class ID: {classId}
           </p>
         </div>
         <div className="badge bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
@@ -154,7 +182,7 @@ export default function MySchedulePage() {
             icon={Calendar}
             title={t("noSchedules") || "No schedules"}
             description={
-              t("emptySchedules") || "No schedules available for your class"
+              t("emptySchedules") || "No schedules available for this class"
             }
           />
         </div>
