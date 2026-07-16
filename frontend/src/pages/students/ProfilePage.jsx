@@ -55,10 +55,16 @@ export default function ProfilePage() {
     }
 
     try {
-      const { data } = await studentService.getProfile();
-      // The response structure: { success: true, data: { ...profile } }
-      console.log("Profile data:", data.data); // Debug log
-      setProfile(data.data);
+      const response = await studentService.getProfile();
+      console.log("Full response:", response); // Debug log
+      console.log("Response data:", response.data); // Debug log
+
+      // FIXED: The response structure is { success: true, data: { ...profile } }
+      // So we need to access response.data.data
+      const profileData = response.data?.data || response.data;
+      console.log("Profile data:", profileData); // Debug log
+
+      setProfile(profileData);
     } catch (error) {
       console.error("Load profile error:", error);
       toast.error("Failed to load profile");
@@ -402,12 +408,12 @@ export default function ProfilePage() {
                   </p>
                 </div>
                 <span
-                  className={`text-sm font-semibold px-2 py-1 rounded-full ${
+                  className={`inline-block text-sm font-semibold px-2.5 py-1 rounded-full ${
                     profile.registrationStatus === "APPROVED"
                       ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
                       : profile.registrationStatus === "PENDING"
                         ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300"
-                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+                        : "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300"
                   }`}
                 >
                   {profile.registrationStatus || "N/A"}
@@ -435,14 +441,16 @@ export default function ProfilePage() {
                     Assigned Class
                   </p>
                 </div>
-                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  {profile.assignedClass?.className || "Not assigned yet"}
-                </span>
-                {profile.assignedClass?.classType && (
-                  <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
-                    ({profile.assignedClass.classType})
+                <div>
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    {profile.assignedClass?.className || "Not assigned yet"}
                   </span>
-                )}
+                  {profile.assignedClass?.classType && (
+                    <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
+                      ({profile.assignedClass.classType})
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Enrolled On */}
@@ -460,7 +468,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Teacher Information - NEW */}
+          {/* Teacher Information */}
           {profile.assignedClass?.teacher && (
             <div className="card">
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-4">
